@@ -13,9 +13,17 @@ import (
 func main() {
 	n := new(netbox.Netbox)
 	n1 := new(netbox.Netbox)
-	err := n.ReadFromNetbox()
-	err1 := n1.ReadFromNetboxFiltered("eks-a")
-	ret, err2 := n1.SerializeMachines(n1.records)
-	fmt.Println(err1)
+	_ = n.ReadFromNetbox()
+	_ = n1.ReadFromNetboxFiltered("eks-a")
+	ret, err2 := n1.SerializeMachines(n1.Records)
+	machines, err := netbox.ReadMachinesBytes(ret)
 	fmt.Println(err)
+	fmt.Println(ret, err2)
+	// for _, machine := range machines {
+	// 	fmt.Println(*machine)
+	// }
+	file, err := netbox.WriteToCsv(machines)
+	fmt.Println("error witing to csv: ", err)
+	fmt.Println(file)
+
 }
