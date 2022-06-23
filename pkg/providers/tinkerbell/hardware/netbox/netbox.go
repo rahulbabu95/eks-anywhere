@@ -281,7 +281,6 @@ func (n *Netbox) ReadInterfacesFromNetbox(client *client.NetBoxAPI) error {
 }
 
 func (n *Netbox) ReadIpRangeFromNetbox(client *client.NetBoxAPI, ipamReq *ipam.IpamIPRangesListParams) error {
-
 	ipamRes, err := client.Ipam.IpamIPRangesList(ipamReq, nil)
 
 	if err != nil {

@@ -103,8 +103,11 @@ require (
 	github.com/go-openapi/strfmt v0.21.2 // indirect
 	github.com/go-openapi/swag v0.21.1 // indirect
 	github.com/go-openapi/validate v0.21.0 // indirect
+<<<<<<< HEAD
 	github.com/go-playground/locales v0.13.0 // indirect
 	github.com/go-playground/universal-translator v0.17.0 // indirect
+=======
+>>>>>>> dd9039e4f0c09df5f596bd7506780893d72ebb15
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/gobuffalo/flect v0.2.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -145,7 +148,11 @@ require (
 	github.com/mrajashree/etcdadm-bootstrap-provider v1.0.0-rc3 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
+<<<<<<< HEAD
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799 // indirect
+=======
+	github.com/opencontainers/image-spec v1.0.2 // indirect
+>>>>>>> dd9039e4f0c09df5f596bd7506780893d72ebb15
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

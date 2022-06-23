@@ -6,10 +6,6 @@ import (
 	"github.com/aws/eks-anywhere/pkg/providers/tinkerbell/hardware/netbox"
 )
 
-// var (
-// 	err error
-// )
-
 func main() {
 	n := new(netbox.Netbox)
 	n1 := new(netbox.Netbox)
@@ -25,5 +21,10 @@ func main() {
 	file, err := netbox.WriteToCsv(machines)
 	fmt.Println("error witing to csv: ", err)
 	fmt.Println(file)
+
+	err := n.ReadFromNetbox()
+	err1 := n1.ReadFromNetboxFiltered("eks-a")
+	fmt.Println(err1)
+	fmt.Println(err)
 
 }
