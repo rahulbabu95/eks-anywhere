@@ -1,3 +1,0 @@
-
-generate:
-	cd .. && make generate
