@@ -14,9 +14,9 @@ func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Mach
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling the input byte stream: %v", err)
 	}
-	if n.debug {
-		n.logger.Info("Deserealizing input stream succesful", "num_machines", len(hardwareMachines))
-	}
+
+	n.logger.V(0).Info("Deserealizing input stream succesful", "num_machines", len(hardwareMachines))
+
 	return hardwareMachines, nil
 }
 
@@ -43,9 +43,9 @@ func WriteToCsv(ctx context.Context, machines []*Machine, n *Netbox) (*os.File, 
 	}
 	writer.WriteAll(machinesString)
 	mydir, _ := os.Getwd()
-	if n.debug {
-		n.logger.Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
-	}
+
+	n.logger.V(1).Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
+
 	return file, nil
 }
 
