@@ -1,25 +1,29 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"os"
 )
 
-func ReadMachinesBytes(machines []byte) ([]*Machine, error) {
+func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
 	var hardwareMachines []*Machine
 	err := json.Unmarshal(machines, &hardwareMachines)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling the input byte stream: %v", err)
 	}
+	if n.debug {
+		n.logger.Info("Deserealizing input stream succesful", "num_machines", len(hardwareMachines))
+	}
 	return hardwareMachines, nil
 }
 
-func WriteToCsv(machines []*Machine) (*os.File, error) {
+func WriteToCsv(ctx context.Context, machines []*Machine, n *Netbox) (*os.File, error) {
 
-	//Create a csv file usign Os operations
-	file, err := os.Create("csv")
+	//Create a csv file usign OS operations
+	file, err := os.Create("hardware.csv")
 	if err != nil {
 		return nil, fmt.Errorf("error creating file: %v", err)
 	}
@@ -34,10 +38,14 @@ func WriteToCsv(machines []*Machine) (*os.File, error) {
 	var machinesString [][]string
 	for _, machine := range machines {
 		nsCombined := extractNameServers(machine.Nameservers)
-		row := []string{machine.Hostname, machine.BMCIPAddress, machine.BMCUsername, machine.BMCPassword, machine.MACAddress, machine.Netmask, machine.Gateway, nsCombined, "type=" + machine.Labels["type"], machine.Disk}
+		row := []string{machine.Hostname, machine.BMCIPAddress, machine.BMCUsername, machine.BMCPassword, machine.MACAddress, machine.IPAddress, machine.Netmask, machine.Gateway, nsCombined, "type=" + machine.Labels["type"], machine.Disk}
 		machinesString = append(machinesString, row)
 	}
 	writer.WriteAll(machinesString)
+	mydir, _ := os.Getwd()
+	if n.debug {
+		n.logger.Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
+	}
 	return file, nil
 }
 

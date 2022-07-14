@@ -2,11 +2,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 
+	"github.com/go-logr/zerologr"
 	httptransport "github.com/go-openapi/runtime/client"
 	"github.com/netbox-community/go-netbox/netbox/client"
 	"github.com/netbox-community/go-netbox/netbox/client/dcim"
@@ -18,6 +19,8 @@ type Netbox struct {
 	User    string
 	Pass    string
 	Records []*Machine
+	logger  zerologr.Logger
+	debug   bool
 }
 
 // Need to return io.EOF when no more Records are available.
@@ -32,25 +35,15 @@ func (n *Netbox) Read() (Machine, error) {
 // do we translate them all at once or one by one when Read() is called?
 // 3. Read() walks through the list of n.Records and returns them one by one
 
-func (n *Netbox) ReadFromNetbox() error {
+func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToken string) error {
 	// call netbox
 	// get the Records
 	// put them in n.Records
 
 	//Hardcoded as there were issues setting this as env variable in my dev desk. Shouldn't be a problem as would have different implementation for prod
 	//as customers are not going to share this with us
-	// token := os.Getenv("NETBOX_TOKEN")
-	token := "22b8f7da7926b990285d7b1f82165819d380695a"
-
-	if token == "" {
-		return fmt.Errorf("NETBOX_TOKEN is not set")
-	}
-
-	// netboxHost := os.Getenv("NETBOX_HOST")
-	netboxHost := "https://demo.netbox.dev"
-	if netboxHost == "" {
-		return fmt.Errorf("NETBOX_HOST is not set")
-	}
+	token := ValidationToken
+	netboxHost := Host
 
 	transport := httptransport.New(netboxHost, client.DefaultBasePath, []string{"http"})
 	transport.DefaultAuthentication = httptransport.APIKeyAuth("Authorization", "header", "Token "+token)
@@ -59,15 +52,14 @@ func (n *Netbox) ReadFromNetbox() error {
 
 	//Get the devices list from netbox to populate the Machine values
 	deviceReq := dcim.NewDcimDevicesListParams()
-	err := n.ReadDevicesFromNetbox(c, deviceReq)
+	err := n.ReadDevicesFromNetbox(ctx, c, deviceReq)
 
 	// deviceRes, err := c.Dcim.DcimDevicesList(deviceReq, nil)
 	if err != nil {
 		return fmt.Errorf("cannot get Devices list: %v ", err)
-
 	}
 
-	err = n.ReadInterfacesFromNetbox(c)
+	err = n.ReadInterfacesFromNetbox(ctx, c)
 	// interfacesRes, err := c.Dcim.DcimInterfacesList(interfacesReq, nil)
 	if err != nil {
 		return fmt.Errorf("error reading Interfaces list: %v ", err)
@@ -76,31 +68,27 @@ func (n *Netbox) ReadFromNetbox() error {
 
 	//Get the Interfaces list from netbox to populate the Machine gateway and nameserver value
 	ipamReq := ipam.NewIpamIPRangesListParams()
-	n.ReadIpRangeFromNetbox(c, ipamReq)
-	fmt.Println("----------------------------------------ALL DEVICES---------------------------------------------------")
+	n.ReadIpRangeFromNetbox(ctx, c, ipamReq)
+	if n.debug {
+		n.logger.Info("ALL DEVICES")
+	}
+
 	for _, machine := range n.Records {
-		fmt.Println(machine)
+		if n.debug {
+			n.logger.Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
+		}
 	}
 
 	return nil
 }
 
 // Field used for filtering
-func (n *Netbox) ReadFromNetboxFiltered(filterTag string) error {
+func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, ValidationToken string, filterTag string) error {
 	//Hardcoded as there were issues setting this as env variable in my dev desk. Shouldn't be a problem as would have different implementation for prod
 	//as customers are not going to share this with us
-	// token := os.Getenv("NETBOX_TOKEN")
-	token := "22b8f7da7926b990285d7b1f82165819d380695a"
 
-	if token == "" {
-		return fmt.Errorf("NETBOX_TOKEN is not set")
-	}
-
-	// netboxHost := os.Getenv("NETBOX_HOST")
-	netboxHost := "https://demo.netbox.dev"
-	if netboxHost == "" {
-		return fmt.Errorf("NETBOX_HOST is not set")
-	}
+	token := ValidationToken
+	netboxHost := Host
 
 	transport := httptransport.New(netboxHost, client.DefaultBasePath, []string{"http"})
 	transport.DefaultAuthentication = httptransport.APIKeyAuth("Authorization", "header", "Token "+token)
@@ -109,16 +97,14 @@ func (n *Netbox) ReadFromNetboxFiltered(filterTag string) error {
 
 	//Get the devices list from netbox to populate the Machine values
 	deviceReq := dcim.NewDcimDevicesListParams()
-
-	// filterTag := "eks-a"
 	deviceReq.Tag = &filterTag
 
-	err := n.ReadDevicesFromNetbox(c, deviceReq)
+	err := n.ReadDevicesFromNetbox(ctx, c, deviceReq)
 	if err != nil {
 		return fmt.Errorf("could not get Devices list: %v", err)
 	}
 	//Get the Interfaces list from netbox to populate the Machine mac value
-	err = n.ReadInterfacesFromNetbox(c)
+	err = n.ReadInterfacesFromNetbox(ctx, c)
 
 	if err != nil {
 		return fmt.Errorf("error reading Interfaces list: %v ", err)
@@ -126,53 +112,59 @@ func (n *Netbox) ReadFromNetboxFiltered(filterTag string) error {
 
 	//Get the Interfaces list from netbox to populate the Machine gateway and nameserver value
 	ipamReq := ipam.NewIpamIPRangesListParams()
-	n.ReadIpRangeFromNetbox(c, ipamReq)
+	n.ReadIpRangeFromNetbox(ctx, c, ipamReq)
 
-	fmt.Println("----------------------------------------FILTERED DEVICES---------------------------------------------------")
+	if n.debug {
+		n.logger.Info("FILTERED DEVICES")
+	}
 	for _, machine := range n.Records {
-		fmt.Println(machine)
+		if n.debug {
+			n.logger.Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
+		}
 	}
 	return nil
 
 }
 
 //Function to check if a given ip address (ip parameter) falls in between a start (startIpRange parameter) and end (endIpRange parameter) IP address
-func (n *Netbox) check(ip string, startIpRange string, endIpRange string) bool {
+func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, endIpRange string) bool {
 	startIp, _, err := net.ParseCIDR(startIpRange)
 	if err != nil {
-		log.Fatal(err)
+		if n.debug {
+			n.logger.Error(err, "error parsing IP in start range")
+		}
 	}
 
 	endIp, _, err := net.ParseCIDR(endIpRange)
 	if err != nil {
-		log.Fatal(err)
+		if n.debug {
+			n.logger.Error(err, "error parsing IP in end range")
+		}
 	}
 
 	trial := net.ParseIP(ip)
 	if trial.To4() == nil {
-		fmt.Printf("%v is not an IPv4 address\n", trial)
+		if n.debug {
+			n.logger.Error(err, "error parsing IP to IP4 address")
+		}
 		return false
 	}
 
 	if bytes.Compare(trial, startIp) >= 0 && bytes.Compare(trial, endIp) <= 0 {
-		// fmt.Printf("%v is between %v and %v\n", trial, startIp, endIp)
 		return true
 	}
 
-	fmt.Printf("%v is NOT between %v and %v\n", trial, startIp, endIp)
 	return false
 }
 
-func (n *Netbox) ReadDevicesFromNetbox(client *client.NetBoxAPI, deviceReq *dcim.DcimDevicesListParams) error {
+func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBoxAPI, deviceReq *dcim.DcimDevicesListParams) error {
 
 	deviceRes, err := client.Dcim.DcimDevicesList(deviceReq, nil)
 	if err != nil {
 		return fmt.Errorf("cannot get Devices list: %v ", err)
-
 	}
 
 	device_payload := deviceRes.GetPayload()
-	// var n.Records []Machine
 
 	for _, device := range device_payload.Results {
 		machine := new(Machine)
@@ -245,10 +237,13 @@ func (n *Netbox) ReadDevicesFromNetbox(client *client.NetBoxAPI, deviceReq *dcim
 		machine.Labels = labelMap
 		n.Records = append(n.Records, machine)
 	}
+	if n.debug {
+		n.logger.Info("step 1 - Reading devices successul", "num_machines", len(n.Records))
+	}
 	return nil
 }
 
-func (n *Netbox) ReadInterfacesFromNetbox(client *client.NetBoxAPI) error {
+func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.NetBoxAPI) error {
 	//Get the Interfaces list from netbox to populate the Machine mac value
 	interfacesReq := dcim.NewDcimInterfacesListParams()
 
@@ -276,10 +271,13 @@ func (n *Netbox) ReadInterfacesFromNetbox(client *client.NetBoxAPI) error {
 			}
 		}
 	}
+	if n.debug {
+		n.logger.Info("step 2 - Reading intefaces successful, MAC addresses set")
+	}
 	return nil
 }
 
-func (n *Netbox) ReadIpRangeFromNetbox(client *client.NetBoxAPI, ipamReq *ipam.IpamIPRangesListParams) error {
+func (n *Netbox) ReadIpRangeFromNetbox(ctx context.Context, client *client.NetBoxAPI, ipamReq *ipam.IpamIPRangesListParams) error {
 	ipamRes, err := client.Ipam.IpamIPRangesList(ipamReq, nil)
 
 	if err != nil {
@@ -290,7 +288,7 @@ func (n *Netbox) ReadIpRangeFromNetbox(client *client.NetBoxAPI, ipamReq *ipam.I
 	for _, record := range n.Records {
 		for _, ipRange := range ipam_payload.Results {
 			//Check if the IP of machine lies between the start and end address in the IP range. If so, update the nameserver and gateway value of the machine
-			if n.check(record.IPAddress, *ipRange.StartAddress, *ipRange.EndAddress) {
+			if n.CheckIp(ctx, record.IPAddress, *ipRange.StartAddress, *ipRange.EndAddress) {
 				customFields, Ok := ipRange.CustomFields.(map[string]interface{})
 				if !Ok {
 					return fmt.Errorf("cannot get ipRange Custom fields from Netbox: %v", Ok)
@@ -344,6 +342,9 @@ func (n *Netbox) ReadIpRangeFromNetbox(client *client.NetBoxAPI, ipamReq *ipam.I
 			}
 		}
 	}
+	if n.debug {
+		n.logger.Info("step 3 - Reading IPAM data successful, all DCIM calls are complete")
+	}
 	return nil
 }
 
@@ -352,6 +353,5 @@ func (n *Netbox) SerializeMachines(machines []*Machine) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error in encoding Machines to byte Array: %v", err)
 	}
-	fmt.Println(string(ret))
 	return ret, nil
 }
