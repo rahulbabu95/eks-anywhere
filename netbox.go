@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/go-logr/zerologr"
+	"github.com/go-logr/logr"
+	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
 	"github.com/netbox-community/go-netbox/netbox/client"
 	"github.com/netbox-community/go-netbox/netbox/client/dcim"
@@ -19,8 +20,7 @@ type Netbox struct {
 	User    string
 	Pass    string
 	Records []*Machine
-	logger  zerologr.Logger
-	debug   bool
+	logger  logr.Logger
 }
 
 // Need to return io.EOF when no more Records are available.
@@ -69,14 +69,10 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 	//Get the Interfaces list from netbox to populate the Machine gateway and nameserver value
 	ipamReq := ipam.NewIpamIPRangesListParams()
 	n.ReadIpRangeFromNetbox(ctx, c, ipamReq)
-	if n.debug {
-		n.logger.Info("ALL DEVICES")
-	}
+	n.logger.V(1).Info("ALL DEVICES")
 
 	for _, machine := range n.Records {
-		if n.debug {
-			n.logger.Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
-		}
+		n.logger.V(1).Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
 	}
 
 	return nil
@@ -114,13 +110,10 @@ func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, Valida
 	ipamReq := ipam.NewIpamIPRangesListParams()
 	n.ReadIpRangeFromNetbox(ctx, c, ipamReq)
 
-	if n.debug {
-		n.logger.Info("FILTERED DEVICES")
-	}
+	n.logger.V(1).Info("FILTERED DEVICES")
+
 	for _, machine := range n.Records {
-		if n.debug {
-			n.logger.Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
-		}
+		n.logger.V(1).Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
 	}
 	return nil
 
@@ -130,16 +123,12 @@ func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, Valida
 func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, endIpRange string) bool {
 	startIp, _, err := net.ParseCIDR(startIpRange)
 	if err != nil {
-		if n.debug {
-			n.logger.Error(err, "error parsing IP in start range")
-		}
+		n.logger.V(1).Error(err, "error parsing IP in start range")
 	}
 
 	endIp, _, err := net.ParseCIDR(endIpRange)
 	if err != nil {
-		if n.debug {
-			n.logger.Error(err, "error parsing IP in end range")
-		}
+		n.logger.V(1).Error(err, "error parsing IP in end range")
 	}
 
 	trial := net.ParseIP(ip)
@@ -158,8 +147,10 @@ func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, en
 }
 
 func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBoxAPI, deviceReq *dcim.DcimDevicesListParams) error {
-
-	deviceRes, err := client.Dcim.DcimDevicesList(deviceReq, nil)
+	opt := func(o *runtime.ClientOperation) {
+		o.Context = ctx
+	}
+	deviceRes, err := client.Dcim.DcimDevicesList(deviceReq, nil, opt)
 	if err != nil {
 		return fmt.Errorf("cannot get Devices list: %v ", err)
 	}
