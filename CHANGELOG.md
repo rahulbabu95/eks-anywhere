@@ -1,1 +1,0 @@
-[Changelog](docs/content/en/docs/reference/changelog.md)
