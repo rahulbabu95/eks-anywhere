@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 )
 
 func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
@@ -14,41 +15,53 @@ func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Mach
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshalling the input byte stream: %v", err)
 	}
-	if n.debug {
-		n.logger.Info("Deserealizing input stream succesful", "num_machines", len(hardwareMachines))
-	}
+
+	n.logger.V(1).Info("Deserealizing input stream succesful", "num_machines", len(hardwareMachines))
+
 	return hardwareMachines, nil
 }
 
-func WriteToCsv(ctx context.Context, machines []*Machine, n *Netbox) (*os.File, error) {
+func WriteToCSV(ctx context.Context, machines []*Machine, n *Netbox) error {
+	errChan := make(chan error)
+	go writeToCSV(errChan, machines, n)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-errChan:
+		return err
+	}
+}
 
+func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
 	//Create a csv file usign OS operations
 	file, err := os.Create("hardware.csv")
 	if err != nil {
-		return nil, fmt.Errorf("error creating file: %v", err)
+		errChan <- fmt.Errorf("error creating file: %v", err)
+		return
 	}
 	defer file.Close()
-
+	// time.Sleep(time.Second)
 	writer := csv.NewWriter(file)
 	headers := [11]string{"hostname", "bmc_ip", "bmc_username", "bmc_password", "mac", "ip_address", "netmask", "gateway", "nameservers", "labels", "disk"}
 	err = writer.Write(headers[:])
 	if err != nil {
-		return nil, fmt.Errorf("error Writing Column names into file: %v", err)
+		errChan <- fmt.Errorf("error Writing Column names into file: %v", err)
+		return
 	}
+	// time.Sleep(time.Second)
 	var machinesString [][]string
 	for _, machine := range machines {
 		nsCombined := extractNameServers(machine.Nameservers)
 		row := []string{machine.Hostname, machine.BMCIPAddress, machine.BMCUsername, machine.BMCPassword, machine.MACAddress, machine.IPAddress, machine.Netmask, machine.Gateway, nsCombined, "type=" + machine.Labels["type"], machine.Disk}
 		machinesString = append(machinesString, row)
 	}
+	// time.Sleep(time.Second)
 	writer.WriteAll(machinesString)
 	mydir, _ := os.Getwd()
-	if n.debug {
-		n.logger.Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
-	}
-	return file, nil
+	time.Sleep(time.Second)
+	n.logger.V(1).Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
+	errChan <- nil
 }
-
 func extractNameServers(nameservers []string) string {
 	nsCombined := ""
 	for idx, ns := range nameservers {

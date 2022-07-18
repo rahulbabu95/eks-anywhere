@@ -34,18 +34,12 @@ func main() {
 	flag.Parse()
 	if len(*host) == 0 {
 		fmt.Fprintln(os.Stdout, "Host cannot be blank")
+		return
 	} else if len(*token) == 0 {
 		fmt.Fprintln(os.Stdout, "token ID cannot be blank")
-	} else if *debug {
-		fmt.Println("----------------------------DEBUG LOGS------------------------------------")
-		err := runClient(ctx, *host, *token, *tag, *debug)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-		}
-	} else {
-		err := runClient(ctx, *host, *token, *tag, *debug)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-		}
+		return
+	}
+	if err := runClient(ctx, *host, *token, *tag, *debug); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 	}
 }
