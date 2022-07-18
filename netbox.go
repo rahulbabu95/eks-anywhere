@@ -21,7 +21,6 @@ type Netbox struct {
 	Pass    string
 	Records []*Machine
 	logger  logr.Logger
-	debug   bool
 }
 
 // Need to return io.EOF when no more Records are available.
@@ -74,7 +73,7 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 	n.logger.V(1).Info("ALL DEVICES")
 
 	for _, machine := range n.Records {
-		n.logger.V(1).Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
+		n.logger.V(1).Info("Device Read: ", "Host", machine.Hostname, "IP", machine.IPAddress, "MAC", machine.MACAddress, "BMC-IP", machine.BMCIPAddress)
 
 	}
 
@@ -115,7 +114,7 @@ func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, Valida
 
 	n.logger.V(1).Info("FILTERED DEVICES")
 	for _, machine := range n.Records {
-		n.logger.V(1).Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
+		n.logger.V(1).Info("Device Read: ", "Host", machine.Hostname, "IP", machine.IPAddress, "MAC", machine.MACAddress, "BMC-IP", machine.BMCIPAddress)
 	}
 	return nil
 
