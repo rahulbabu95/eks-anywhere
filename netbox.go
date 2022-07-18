@@ -70,9 +70,8 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 	//Get the Interfaces list from netbox to populate the Machine gateway and nameserver value
 	ipamReq := ipam.NewIpamIPRangesListParams()
 	n.ReadIpRangeFromNetbox(ctx, c, ipamReq)
-	if n.debug {
-		n.logger.Info("ALL DEVICES")
-	}
+
+	n.logger.V(1).Info("ALL DEVICES")
 
 	for _, machine := range n.Records {
 		n.logger.V(1).Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
@@ -114,7 +113,7 @@ func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, Valida
 	ipamReq := ipam.NewIpamIPRangesListParams()
 	n.ReadIpRangeFromNetbox(ctx, c, ipamReq)
 
-	n.logger.V(0).Info("FILTERED DEVICES")
+	n.logger.V(1).Info("FILTERED DEVICES")
 	for _, machine := range n.Records {
 		n.logger.V(1).Info(machine.Hostname, machine.IPAddress, machine.MACAddress, machine.BMCIPAddress)
 	}

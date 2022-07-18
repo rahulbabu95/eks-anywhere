@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"time"
 )
 
 func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
@@ -40,7 +39,6 @@ func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
 		return
 	}
 	defer file.Close()
-	// time.Sleep(time.Second)
 	writer := csv.NewWriter(file)
 	headers := [11]string{"hostname", "bmc_ip", "bmc_username", "bmc_password", "mac", "ip_address", "netmask", "gateway", "nameservers", "labels", "disk"}
 	err = writer.Write(headers[:])
@@ -48,17 +46,14 @@ func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
 		errChan <- fmt.Errorf("error Writing Column names into file: %v", err)
 		return
 	}
-	// time.Sleep(time.Second)
 	var machinesString [][]string
 	for _, machine := range machines {
 		nsCombined := extractNameServers(machine.Nameservers)
 		row := []string{machine.Hostname, machine.BMCIPAddress, machine.BMCUsername, machine.BMCPassword, machine.MACAddress, machine.IPAddress, machine.Netmask, machine.Gateway, nsCombined, "type=" + machine.Labels["type"], machine.Disk}
 		machinesString = append(machinesString, row)
 	}
-	// time.Sleep(time.Second)
 	writer.WriteAll(machinesString)
 	mydir, _ := os.Getwd()
-	time.Sleep(time.Second)
 	n.logger.V(1).Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
 	errChan <- nil
 }

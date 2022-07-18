@@ -18,11 +18,8 @@ func runClient(ctx context.Context, host string, token string, tag string, debug
 	// token := "0123456789abcdef0123456789abcdef01234567"
 	// host := "localhost:8000"
 
-	if debug {
-		n.logger = defaultLogger(true)
-	} else {
-		n.logger = defaultLogger(false)
-	}
+	n.logger = defaultLogger(debug)
+
 	err := n.ReadFromNetboxFiltered(ctx, host, token, tag)
 	if err != nil {
 		return fmt.Errorf("filtered Read from Netbox failed: %v", err)
