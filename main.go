@@ -9,16 +9,8 @@ import (
 	"syscall"
 )
 
-// textctl is a simple applications in which all commands are built up in func
-// main. It demonstrates how to declare minimal commands, how to wire them
-// together into a command tree, and one way to allow subcommands access to
-// flags set in parent commands.
-
 func main() {
 
-	// keep ffcli or remove .? --done
-	// Clean up the stdout -- done
-	// log level. -- flag for logging.
 	exitCode := 0
 	defer func() {
 		os.Exit(exitCode)

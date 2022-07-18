@@ -23,25 +23,9 @@ type Netbox struct {
 	logger  logr.Logger
 }
 
-// Need to return io.EOF when no more Records are available.
-// This method need to be a generator.
-func (n *Netbox) Read() (Machine, error) {
-	return Machine{}, nil
-}
-
-// 1. call Netbox, and get VM devices, maybe match on some filter of a VM device?
-// return value in some kind slice of VM devices
-// 2. translate from netbox data type to Machine // for testability we might want a single function here.
-// do we translate them all at once or one by one when Read() is called?
-// 3. Read() walks through the list of n.Records and returns them one by one
-
+//ReadFromNetbox Function calls 3 helper functions which makes API calls to Netbox and sets Records field with required Hardware value
 func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToken string) error {
-	// call netbox
-	// get the Records
-	// put them in n.Records
 
-	//Hardcoded as there were issues setting this as env variable in my dev desk. Shouldn't be a problem as would have different implementation for prod
-	//as customers are not going to share this with us
 	token := ValidationToken
 	netboxHost := Host
 
@@ -54,13 +38,11 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 	deviceReq := dcim.NewDcimDevicesListParams()
 	err := n.ReadDevicesFromNetbox(ctx, c, deviceReq)
 
-	// deviceRes, err := c.Dcim.DcimDevicesList(deviceReq, nil)
 	if err != nil {
 		return fmt.Errorf("cannot get Devices list: %v ", err)
 	}
 
 	err = n.ReadInterfacesFromNetbox(ctx, c)
-	// interfacesRes, err := c.Dcim.DcimInterfacesList(interfacesReq, nil)
 	if err != nil {
 		return fmt.Errorf("error reading Interfaces list: %v ", err)
 
@@ -80,10 +62,8 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 	return nil
 }
 
-// Field used for filtering
+//ReadFromNetboxFiltered Function calls 3 helper functions with a filter tag which makes API calls to Netbox and sets Records field with required Hardware value
 func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, ValidationToken string, filterTag string) error {
-	//Hardcoded as there were issues setting this as env variable in my dev desk. Shouldn't be a problem as would have different implementation for prod
-	//as customers are not going to share this with us
 
 	token := ValidationToken
 	netboxHost := Host
@@ -146,6 +126,7 @@ func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, en
 	return false
 }
 
+//ReadDevicesFromNetbox Function fetches the devices list from Netbox and sets HostName, BMC info, Ip addr, Disk and Labels
 func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBoxAPI, deviceReq *dcim.DcimDevicesListParams) error {
 
 	option := func(o *runtime.ClientOperation) {
@@ -235,6 +216,7 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 	return nil
 }
 
+//ReadInterfacesFromNetbox Function fetches the interfaces list from Netbox and sets the MAC address for each record
 func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.NetBoxAPI) error {
 	//Get the Interfaces list from netbox to populate the Machine mac value
 	interfacesReq := dcim.NewDcimInterfacesListParams()
@@ -252,8 +234,6 @@ func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.Ne
 		}
 		interfacesResults := interfacesRes.GetPayload().Results
 
-		// Check if we get 1 or more interfaces and handle accordingly
-		// No need for length checking
 		if len(interfacesResults) == 1 {
 			record.MACAddress = *interfacesResults[0].MacAddress
 		} else {
@@ -272,6 +252,7 @@ func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.Ne
 	return nil
 }
 
+//ReadIpRangeFromNetbox Function fetches IP ranges from Netbox and sets the Gateway and nameserver address for each record
 func (n *Netbox) ReadIpRangeFromNetbox(ctx context.Context, client *client.NetBoxAPI, ipamReq *ipam.IpamIPRangesListParams) error {
 
 	option := func(o *runtime.ClientOperation) {
