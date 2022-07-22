@@ -105,11 +105,13 @@ func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, en
 	startIp, _, err := net.ParseCIDR(startIpRange)
 	if err != nil {
 		n.logger.Error(err, "error parsing IP in start range")
+		return false
 	}
 
 	endIp, _, err := net.ParseCIDR(endIpRange)
 	if err != nil {
 		n.logger.Error(err, "error parsing IP in end range")
+		return false
 	}
 
 	trial := net.ParseIP(ip)
@@ -135,7 +137,7 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 
 	deviceRes, err := client.Dcim.DcimDevicesList(deviceReq, nil, option)
 	if err != nil {
-		return fmt.Errorf("cannot get Devices list: %v ", err)
+		return fmt.Errorf("cannot get Devices list: %v", err)
 	}
 
 	device_payload := deviceRes.GetPayload()
@@ -152,7 +154,7 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 
 		bmcIPMap, Ok := customFields["bmc_ip"].(map[string]interface{})
 		if !Ok {
-			return fmt.Errorf("cannot get BMC IP from  Netbox, %v", Ok)
+			return fmt.Errorf("type Assertion error for BMC IP, %v", Ok)
 		}
 
 		bmcIPVal, Ok := bmcIPMap["address"].(string)
@@ -229,11 +231,10 @@ func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.Ne
 		interfacesRes, err := client.Dcim.DcimInterfacesList(interfacesReq, nil, option)
 
 		if err != nil {
-			return fmt.Errorf("cannot get Interfaces list: %v for hostname %v ", err, interfacesReq.Device)
+			return fmt.Errorf("cannot get Interfaces list: %v for hostname %v", err, *interfacesReq.Device)
 
 		}
 		interfacesResults := interfacesRes.GetPayload().Results
-
 		if len(interfacesResults) == 1 {
 			record.MACAddress = *interfacesResults[0].MacAddress
 		} else {
