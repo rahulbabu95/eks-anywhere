@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -11,8 +12,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/netbox-community/go-netbox/netbox/client"
 	"github.com/netbox-community/go-netbox/netbox/client/dcim"
+	"github.com/netbox-community/go-netbox/netbox/client/ipam"
 	"github.com/netbox-community/go-netbox/netbox/models"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCheckIP(t *testing.T) {
@@ -54,11 +55,6 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 		primIp      string
 		ifError     error
 	}
-
-	// type expected struct{
-	// 	machines []*Machine
-	// 	err 	error
-	// }
 
 	type inputs struct {
 		v    outputs
@@ -123,7 +119,7 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 			disk:        "/dev/sda",
 			name:        "dev",
 			primIp:      "192.18.2.5/22",
-			ifError:     errors.New("cannot parse BMC IP, invalid CIDR address: 192.168.2.5"),
+			ifError:     &IpError{"192.168.2.5"},
 		},
 			err: nil, want: []*Machine{
 				{},
@@ -137,7 +133,7 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 			label:       "control-plane",
 			name:        "dev",
 			primIp:      "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
-			ifError:     errors.New("cannot parse Machine IP Address, invalid CIDR address: 2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+			ifError:     &IpError{"2001:0db8:85a3:0000:0000:8a2e:0370:7334"},
 		},
 			err: nil, want: []*Machine{
 				{},
@@ -151,17 +147,15 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 			label:       "",
 			name:        "dev",
 			primIp:      "192.18.2.5/22",
-			ifError:     errors.New("cannot parse BMC IP, invalid CIDR address: 192.460.634.516/22"),
+			ifError:     &IpError{"192.460.634.516/22"},
 		},
 			err: nil, want: []*Machine{
 				{},
 			}},
 		{v: outputs{
-			ifError: errors.New("cannot get Devices list: error code 500-Internal Server Error"),
+			ifError: &NetboxError{"cannot get Devices list", "error code 500-Internal Server Error"},
 		},
-			err: errors.New("error code 500-Internal Server Error"), want: []*Machine{
-				{},
-			}},
+			err: errors.New("error code 500-Internal Server Error"), want: []*Machine{}},
 	}
 
 	for _, tt := range tests {
@@ -190,11 +184,11 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 		err := n.ReadDevicesFromNetbox(context.TODO(), c, deviceReq)
 
 		if err != nil {
-			expErr := tt.v.ifError
+			if !errors.Is(err, tt.v.ifError) {
+				t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
+			}
 			//skip assert, and compare the error strings directly.
-			assert.EqualErrorf(t, err, expErr.Error(), "Error should be: %v, got: %v", tt.v.ifError, err)
 		} else {
-			// fmt.Println(n.Records)
 			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
 				t.Fatal(diff)
 			}
@@ -248,7 +242,7 @@ func TestReadInterfacesFromNetbox(t *testing.T) {
 		// Checking Unhappy flow by generating error from API
 		{v: outputs{
 			device:  "errorDev",
-			ifError: errors.New("cannot get Interfaces list: error code 500-Internal Server Error for hostname errorDev"),
+			ifError: &NetboxError{"cannot get Interfaces list", "error code 500-Internal Server Error"},
 		},
 			err: errors.New("error code 500-Internal Server Error"), want: []*Machine{}},
 	}
@@ -266,7 +260,7 @@ func TestReadInterfacesFromNetbox(t *testing.T) {
 		for idx := range tt.v.MacAddress {
 			i := new(models.Interface)
 			i.Name = &tt.v.Name[idx]
-			// i.Device = &models.NestedDevice{Name: toPointer(tt.v.device)}
+
 			i.MacAddress = &tt.v.MacAddress[idx]
 			if idx == tt.v.Tag {
 				i.Tags = []*models.NestedTag{{Name: toPointer("eks-a")}}
@@ -276,18 +270,17 @@ func TestReadInterfacesFromNetbox(t *testing.T) {
 
 		dummyIntListOK := new(dcim.DcimInterfacesListOK)
 		dummyIntListOKBody := new(dcim.DcimInterfacesListOKBody)
-
-		// dummyDevListOK.Payload = new(models.Device)
 		dummyIntListOKBody.Results = dummyInterfaceList
 		dummyIntListOK.Payload = dummyIntListOKBody
 		i := &mock{i: dummyIntListOK, err: tt.err}
 		c := &client.NetBoxAPI{Dcim: i}
-		// interfaceReq := dcim.NewDcimInterfacesListParams()
+
 		err := n.ReadInterfacesFromNetbox(context.TODO(), c)
 
 		if err != nil {
-			expErr := tt.v.ifError
-			assert.EqualErrorf(t, err, expErr.Error(), "Error should be: %v, got: %v", tt.v.ifError, err)
+			if !errors.Is(err, tt.v.ifError) {
+				t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
+			}
 		} else {
 			fmt.Println(n.Records)
 			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
@@ -297,9 +290,254 @@ func TestReadInterfacesFromNetbox(t *testing.T) {
 	}
 }
 
+func TestTypeAssertions(t *testing.T) {
+	type outputs struct {
+		bmcIp       interface{}
+		bmcUsername interface{}
+		bmcPassword interface{}
+		disk        interface{}
+		name        string
+		primIp      string
+	}
+
+	type inputs struct {
+		v    outputs
+		err  error
+		want error
+	}
+
+	var tests = []inputs{
+
+		{v: outputs{
+			bmcIp:       "192.168.2.5/22",
+			bmcUsername: "root",
+			bmcPassword: "root",
+			disk:        "/dev/sda",
+			name:        "dev",
+			primIp:      "192.18.2.5/22",
+		},
+			err: nil, want: &TypeAssertError{"bmc_ip", "map[string]interface{}", "string"}},
+		{v: outputs{
+			bmcIp:       map[string]interface{}{"address": 192.431},
+			bmcUsername: "root",
+			bmcPassword: "root",
+			disk:        "/dev/sda",
+			name:        "dev",
+			primIp:      "192.18.2.5/22",
+		},
+			err: nil, want: &TypeAssertError{"bmc_ip_address", "string", "float64"}},
+		{v: outputs{
+			bmcIp:       map[string]interface{}{"address": "192.168.2.5/22"},
+			bmcUsername: []string{"root1", "root2"},
+			bmcPassword: "root",
+			disk:        "/dev/sda",
+			name:        "dev",
+			primIp:      "192.18.2.5/22",
+		},
+			err: nil, want: &TypeAssertError{"bmc_username", "string", "[]string"}},
+		{v: outputs{
+			bmcIp:       map[string]interface{}{"address": "192.168.2.5/22"},
+			bmcUsername: "root1",
+			bmcPassword: []string{"root1", "root2"},
+			disk:        "/dev/sda",
+			name:        "dev",
+			primIp:      "192.18.2.5/22",
+		},
+			err: nil, want: &TypeAssertError{"bmc_password", "string", "[]string"}},
+		{v: outputs{
+			bmcIp:       map[string]interface{}{"address": "192.168.2.5/22"},
+			bmcUsername: "root",
+			bmcPassword: "root",
+			disk:        123,
+			name:        "dev",
+			primIp:      "192.18.2.5/22",
+		},
+			err: nil, want: &TypeAssertError{"disk", "string", "int"}}}
+
+	for _, tt := range tests {
+
+		n := new(Netbox)
+		n.logger = logr.Discard()
+		d := new(models.DeviceWithConfigContext)
+		d.Name = toPointer(tt.v.name)
+
+		d.CustomFields = map[string]interface{}{
+
+			"bmc_ip":       tt.v.bmcIp,
+			"bmc_username": tt.v.bmcUsername,
+			"bmc_password": tt.v.bmcPassword,
+			"disk":         tt.v.disk,
+		}
+		d.PrimaryIp4 = &models.NestedIPAddress{Address: toPointer(tt.v.primIp)}
+		dummyDevListOK := new(dcim.DcimDevicesListOK)
+		dummyDevListOKBody := new(dcim.DcimDevicesListOKBody)
+
+		dummyDevListOKBody.Results = []*models.DeviceWithConfigContext{d}
+		dummyDevListOK.Payload = dummyDevListOKBody
+		v := &mock{v: dummyDevListOK, err: tt.err}
+		c := &client.NetBoxAPI{Dcim: v}
+		deviceReq := dcim.NewDcimDevicesListParams()
+		err := n.ReadDevicesFromNetbox(context.TODO(), c, deviceReq)
+
+		if err != nil {
+			if !errors.Is(err, tt.want) {
+				t.Fatal("Got: ", err.Error(), "want: ", tt.want)
+			}
+
+		} else {
+			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
+				t.Fatal(diff)
+			}
+		}
+
+	}
+}
+
+func TestReadIpRangeFromNetbox(t *testing.T) {
+
+	type outputs struct {
+		gatewayIp    interface{}
+		nameserverIp []interface{}
+		startIp      string
+		endIp        string
+		ifError      error
+	}
+
+	type inputs struct {
+		v    outputs
+		err  error
+		want []*Machine
+	}
+
+	var tests = []inputs{
+
+		{v: outputs{
+			gatewayIp:    map[string]interface{}{"address": "10.80.8.1/22"},
+			nameserverIp: []interface{}{map[string]interface{}{"address": "208.91.112.53/22"}},
+			startIp:      "10.80.12.20/22",
+			endIp:        "10.80.12.30/22",
+		},
+			err: nil, want: []*Machine{
+				{
+					IPAddress:   "10.80.12.25",
+					Gateway:     "10.80.8.1",
+					Nameservers: Nameservers{"208.91.112.53"},
+				},
+			}},
+		{v: outputs{
+			gatewayIp:    map[string]interface{}{"address": "10.800.8.1/22"},
+			nameserverIp: []interface{}{map[string]interface{}{"address": "208.91.112.53/22"}},
+			startIp:      "10.80.12.20/22",
+			endIp:        "10.80.12.30/22",
+			ifError:      &IpError{"10.800.8.1/22"},
+		},
+			err: nil, want: []*Machine{}},
+		{v: outputs{
+			gatewayIp:    map[string]interface{}{"address": "10.80.8.1/22"},
+			nameserverIp: []interface{}{map[string]interface{}{"address": "208.910.112.53/22"}},
+			startIp:      "10.80.12.20/22",
+			endIp:        "10.80.12.30/22",
+			ifError:      &IpError{"208.910.112.53/22"},
+		},
+			err: nil, want: []*Machine{}},
+		{v: outputs{
+			gatewayIp:    map[string]string{"address": "10.80.8.1/22"},
+			nameserverIp: []interface{}{map[string]interface{}{"address": "208.91.112.53/22"}},
+			startIp:      "10.80.12.20/22",
+			endIp:        "10.80.12.30/22",
+			ifError:      &TypeAssertError{"gatewayIP", "map[string]interface{}", "map[string]string"},
+		},
+			err: nil, want: []*Machine{}},
+		{v: outputs{
+			gatewayIp:    map[string]interface{}{"address": 102.45},
+			nameserverIp: []interface{}{map[string]interface{}{"address": "208.91.112.53/22"}},
+			startIp:      "10.80.12.20/22",
+			endIp:        "10.80.12.30/22",
+			ifError:      &TypeAssertError{"gatewayAddr", "string", "float64"},
+		},
+			err: nil, want: []*Machine{}},
+		{v: outputs{
+			gatewayIp:    map[string]interface{}{"address": "10.80.8.1/22"},
+			nameserverIp: []interface{}{"208.91.112.53/22", "208.91.112.53/22"},
+			startIp:      "10.80.12.20/22",
+			endIp:        "10.80.12.30/22",
+			ifError:      &TypeAssertError{"nameserversIPMap", "map[string]interface{}", "string"},
+		},
+			err: nil, want: []*Machine{}},
+		{v: outputs{
+			gatewayIp:    map[string]interface{}{"address": "10.80.8.1/22"},
+			nameserverIp: []interface{}{map[string]interface{}{"address": 208.91}},
+			startIp:      "10.80.12.20/22",
+			endIp:        "10.80.12.30/22",
+			ifError:      &TypeAssertError{"nameserversIPMap", "string", "float64"},
+		},
+			err: nil, want: []*Machine{}},
+	}
+
+	for _, tt := range tests {
+
+		n := new(Netbox)
+		dummyMachine := &Machine{
+			IPAddress: "10.80.12.25",
+		}
+
+		n.Records = append(n.Records, dummyMachine)
+		n.logger = logr.Discard()
+
+		d := new(models.IPRange)
+		d.StartAddress = &tt.v.startIp
+		d.EndAddress = &tt.v.endIp
+		d.CustomFields = map[string]interface{}{
+			"gateway":     tt.v.gatewayIp,
+			"nameservers": tt.v.nameserverIp,
+		}
+		dummyIprangeListOk := new(ipam.IpamIPRangesListOK)
+		dummyIprangeListOkBody := new(ipam.IpamIPRangesListOKBody)
+		dummyIprangeListOkBody.Results = []*models.IPRange{d}
+		dummyIprangeListOk.Payload = dummyIprangeListOkBody
+		i := &mock{ip: dummyIprangeListOk, err: tt.err}
+		c := &client.NetBoxAPI{Ipam: i}
+
+		ipRangeReq := ipam.NewIpamIPRangesListParams()
+		err := n.ReadIpRangeFromNetbox(context.TODO(), c, ipRangeReq)
+
+		if err != nil {
+			if !errors.Is(err, tt.v.ifError) {
+				t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
+			}
+		} else {
+			fmt.Println(n.Records)
+			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
+				t.Fatal(diff)
+			}
+		}
+	}
+}
+
+func TestSerializeMachines(t *testing.T) {
+
+	var test = []*Machine{{Hostname: "Dev1", IPAddress: "10.80.8.21", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:F4:C1", Disk: "/dev/sda", Labels: map[string]string{"type": "worker-plane"}, BMCIPAddress: "10.80.12.20", BMCUsername: "root", BMCPassword: "pPyU6mAO"},
+		{Hostname: "Dev2", IPAddress: "10.80.8.22", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:EA:11", Disk: "/dev/sda", Labels: map[string]string{"type": "control-plane"}, BMCIPAddress: "10.80.12.21", BMCUsername: "root", BMCPassword: "pPyU6mAO"},
+	}
+
+	want := CreateMachineString(test)
+	n := new(Netbox)
+	n.logger = logr.Discard()
+
+	got, err := n.SerializeMachines(test)
+	if err != nil {
+		t.Fatal("Error: ", err)
+	}
+
+	if !bytes.EqualFold(got, []byte(want)) {
+		t.Fatal(cmp.Diff(got, []byte(want)))
+	}
+}
+
 type mock struct {
 	v   *dcim.DcimDevicesListOK
 	i   *dcim.DcimInterfacesListOK
+	ip  *ipam.IpamIPRangesListOK
 	err error
 }
 
@@ -1387,6 +1625,436 @@ func (m *mock) DcimVirtualChassisRead(params *dcim.DcimVirtualChassisReadParams,
 	return nil, nil
 }
 func (m *mock) DcimVirtualChassisUpdate(params *dcim.DcimVirtualChassisUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...dcim.ClientOption) (*dcim.DcimVirtualChassisUpdateOK, error) {
+	return nil, nil
+}
+
+func (m *mock) IpamAggregatesBulkDelete(params *ipam.IpamAggregatesBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesBulkPartialUpdate(params *ipam.IpamAggregatesBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesBulkUpdate(params *ipam.IpamAggregatesBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesCreate(params *ipam.IpamAggregatesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesDelete(params *ipam.IpamAggregatesDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesList(params *ipam.IpamAggregatesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesPartialUpdate(params *ipam.IpamAggregatesPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesRead(params *ipam.IpamAggregatesReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAggregatesUpdate(params *ipam.IpamAggregatesUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAggregatesUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsBulkDelete(params *ipam.IpamAsnsBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsBulkPartialUpdate(params *ipam.IpamAsnsBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsBulkUpdate(params *ipam.IpamAsnsBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsCreate(params *ipam.IpamAsnsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsDelete(params *ipam.IpamAsnsDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsList(params *ipam.IpamAsnsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsPartialUpdate(params *ipam.IpamAsnsPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsRead(params *ipam.IpamAsnsReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamAsnsUpdate(params *ipam.IpamAsnsUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamAsnsUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsBulkDelete(params *ipam.IpamFhrpGroupAssignmentsBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsBulkPartialUpdate(params *ipam.IpamFhrpGroupAssignmentsBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsBulkUpdate(params *ipam.IpamFhrpGroupAssignmentsBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsCreate(params *ipam.IpamFhrpGroupAssignmentsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsDelete(params *ipam.IpamFhrpGroupAssignmentsDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsList(params *ipam.IpamFhrpGroupAssignmentsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsPartialUpdate(params *ipam.IpamFhrpGroupAssignmentsPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsRead(params *ipam.IpamFhrpGroupAssignmentsReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupAssignmentsUpdate(params *ipam.IpamFhrpGroupAssignmentsUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupAssignmentsUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsBulkDelete(params *ipam.IpamFhrpGroupsBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsBulkPartialUpdate(params *ipam.IpamFhrpGroupsBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsBulkUpdate(params *ipam.IpamFhrpGroupsBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsCreate(params *ipam.IpamFhrpGroupsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsDelete(params *ipam.IpamFhrpGroupsDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsList(params *ipam.IpamFhrpGroupsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsPartialUpdate(params *ipam.IpamFhrpGroupsPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsRead(params *ipam.IpamFhrpGroupsReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamFhrpGroupsUpdate(params *ipam.IpamFhrpGroupsUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamFhrpGroupsUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesBulkDelete(params *ipam.IpamIPAddressesBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesBulkPartialUpdate(params *ipam.IpamIPAddressesBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesBulkUpdate(params *ipam.IpamIPAddressesBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesCreate(params *ipam.IpamIPAddressesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesDelete(params *ipam.IpamIPAddressesDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesList(params *ipam.IpamIPAddressesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesPartialUpdate(params *ipam.IpamIPAddressesPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesRead(params *ipam.IpamIPAddressesReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPAddressesUpdate(params *ipam.IpamIPAddressesUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPAddressesUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesAvailableIpsCreate(params *ipam.IpamIPRangesAvailableIpsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesAvailableIpsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesAvailableIpsList(params *ipam.IpamIPRangesAvailableIpsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesAvailableIpsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesBulkDelete(params *ipam.IpamIPRangesBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesBulkPartialUpdate(params *ipam.IpamIPRangesBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesBulkUpdate(params *ipam.IpamIPRangesBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesCreate(params *ipam.IpamIPRangesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesDelete(params *ipam.IpamIPRangesDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesList(params *ipam.IpamIPRangesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesListOK, error) {
+	return m.ip, nil
+}
+func (m *mock) IpamIPRangesPartialUpdate(params *ipam.IpamIPRangesPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesRead(params *ipam.IpamIPRangesReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamIPRangesUpdate(params *ipam.IpamIPRangesUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamIPRangesUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesAvailableIpsCreate(params *ipam.IpamPrefixesAvailableIpsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesAvailableIpsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesAvailableIpsList(params *ipam.IpamPrefixesAvailableIpsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesAvailableIpsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesAvailablePrefixesCreate(params *ipam.IpamPrefixesAvailablePrefixesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesAvailablePrefixesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesAvailablePrefixesList(params *ipam.IpamPrefixesAvailablePrefixesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesAvailablePrefixesListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesBulkDelete(params *ipam.IpamPrefixesBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesBulkPartialUpdate(params *ipam.IpamPrefixesBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesBulkUpdate(params *ipam.IpamPrefixesBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesCreate(params *ipam.IpamPrefixesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesDelete(params *ipam.IpamPrefixesDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesList(params *ipam.IpamPrefixesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesPartialUpdate(params *ipam.IpamPrefixesPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesRead(params *ipam.IpamPrefixesReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamPrefixesUpdate(params *ipam.IpamPrefixesUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamPrefixesUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsBulkDelete(params *ipam.IpamRirsBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsBulkPartialUpdate(params *ipam.IpamRirsBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsBulkUpdate(params *ipam.IpamRirsBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsCreate(params *ipam.IpamRirsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsDelete(params *ipam.IpamRirsDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsList(params *ipam.IpamRirsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsPartialUpdate(params *ipam.IpamRirsPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsRead(params *ipam.IpamRirsReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRirsUpdate(params *ipam.IpamRirsUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRirsUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesBulkDelete(params *ipam.IpamRolesBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesBulkPartialUpdate(params *ipam.IpamRolesBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesBulkUpdate(params *ipam.IpamRolesBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesCreate(params *ipam.IpamRolesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesDelete(params *ipam.IpamRolesDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesList(params *ipam.IpamRolesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesPartialUpdate(params *ipam.IpamRolesPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesRead(params *ipam.IpamRolesReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRolesUpdate(params *ipam.IpamRolesUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRolesUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsBulkDelete(params *ipam.IpamRouteTargetsBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsBulkPartialUpdate(params *ipam.IpamRouteTargetsBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsBulkUpdate(params *ipam.IpamRouteTargetsBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsCreate(params *ipam.IpamRouteTargetsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsDelete(params *ipam.IpamRouteTargetsDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsList(params *ipam.IpamRouteTargetsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsPartialUpdate(params *ipam.IpamRouteTargetsPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsRead(params *ipam.IpamRouteTargetsReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamRouteTargetsUpdate(params *ipam.IpamRouteTargetsUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamRouteTargetsUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesBulkDelete(params *ipam.IpamServiceTemplatesBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesBulkPartialUpdate(params *ipam.IpamServiceTemplatesBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesBulkUpdate(params *ipam.IpamServiceTemplatesBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesCreate(params *ipam.IpamServiceTemplatesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesDelete(params *ipam.IpamServiceTemplatesDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesList(params *ipam.IpamServiceTemplatesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesPartialUpdate(params *ipam.IpamServiceTemplatesPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesRead(params *ipam.IpamServiceTemplatesReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServiceTemplatesUpdate(params *ipam.IpamServiceTemplatesUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServiceTemplatesUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesBulkDelete(params *ipam.IpamServicesBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesBulkPartialUpdate(params *ipam.IpamServicesBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesBulkUpdate(params *ipam.IpamServicesBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesCreate(params *ipam.IpamServicesCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesDelete(params *ipam.IpamServicesDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesList(params *ipam.IpamServicesListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesPartialUpdate(params *ipam.IpamServicesPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesRead(params *ipam.IpamServicesReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamServicesUpdate(params *ipam.IpamServicesUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamServicesUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsAvailableVlansCreate(params *ipam.IpamVlanGroupsAvailableVlansCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsAvailableVlansCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsAvailableVlansList(params *ipam.IpamVlanGroupsAvailableVlansListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsAvailableVlansListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsBulkDelete(params *ipam.IpamVlanGroupsBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsBulkPartialUpdate(params *ipam.IpamVlanGroupsBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsBulkUpdate(params *ipam.IpamVlanGroupsBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsCreate(params *ipam.IpamVlanGroupsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsDelete(params *ipam.IpamVlanGroupsDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsList(params *ipam.IpamVlanGroupsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsPartialUpdate(params *ipam.IpamVlanGroupsPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsRead(params *ipam.IpamVlanGroupsReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlanGroupsUpdate(params *ipam.IpamVlanGroupsUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlanGroupsUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansBulkDelete(params *ipam.IpamVlansBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansBulkPartialUpdate(params *ipam.IpamVlansBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansBulkUpdate(params *ipam.IpamVlansBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansCreate(params *ipam.IpamVlansCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansDelete(params *ipam.IpamVlansDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansList(params *ipam.IpamVlansListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansPartialUpdate(params *ipam.IpamVlansPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansRead(params *ipam.IpamVlansReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVlansUpdate(params *ipam.IpamVlansUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVlansUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsBulkDelete(params *ipam.IpamVrfsBulkDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsBulkDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsBulkPartialUpdate(params *ipam.IpamVrfsBulkPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsBulkPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsBulkUpdate(params *ipam.IpamVrfsBulkUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsBulkUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsCreate(params *ipam.IpamVrfsCreateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsCreateCreated, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsDelete(params *ipam.IpamVrfsDeleteParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsDeleteNoContent, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsList(params *ipam.IpamVrfsListParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsListOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsPartialUpdate(params *ipam.IpamVrfsPartialUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsPartialUpdateOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsRead(params *ipam.IpamVrfsReadParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsReadOK, error) {
+	return nil, nil
+}
+func (m *mock) IpamVrfsUpdate(params *ipam.IpamVrfsUpdateParams, authInfo runtime.ClientAuthInfoWriter, opts ...ipam.ClientOption) (*ipam.IpamVrfsUpdateOK, error) {
 	return nil, nil
 }
 func (m *mock) SetTransport(transport runtime.ClientTransport) {

@@ -8,6 +8,7 @@ import (
 	"os"
 )
 
+// Function reads a byte array and converts it back to Machine Array
 func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
 	var hardwareMachines []*Machine
 	err := json.Unmarshal(machines, &hardwareMachines)
@@ -20,6 +21,7 @@ func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Mach
 	return hardwareMachines, nil
 }
 
+// WriteToCSV Helper Function creates Error channel and context to cancel file writing on keyboard interrupt
 func WriteToCSV(ctx context.Context, machines []*Machine, n *Netbox) error {
 	errChan := make(chan error)
 	go writeToCSV(errChan, machines, n)
@@ -31,6 +33,7 @@ func WriteToCSV(ctx context.Context, machines []*Machine, n *Netbox) error {
 	}
 }
 
+// writeToCSV Function reads from slice of machines and writes to a hardware.csv file
 func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
 	//Create a csv file usign OS operations
 	file, err := os.Create("hardware.csv")
@@ -57,6 +60,8 @@ func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
 	n.logger.V(1).Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
 	errChan <- nil
 }
+
+// extractNameServers Function reads a slice of string and combines them with '|' separator
 func extractNameServers(nameservers []string) string {
 	nsCombined := ""
 	for idx, ns := range nameservers {
