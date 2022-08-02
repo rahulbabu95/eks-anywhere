@@ -1,6 +1,3 @@
-# eks-anywhere
-Run Amazon EKS on your own infrastructure 🚀
-
 ## Hardware-ingester
 
 An automated hardware ingestion tool for cluster creation on bare metal in [eks-a](https://anywhere.eks.amazonaws.com/docs/getting-started/production-environment/baremetal-getstarted/).
