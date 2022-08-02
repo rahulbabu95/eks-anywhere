@@ -39,7 +39,6 @@ func runClient(ctx context.Context, host string, token string, tag string, debug
 		return fmt.Errorf("error writing to csv: %v", err)
 	}
 	return nil
-
 }
 
 // defaultLogger is a zerolog logr implementation.

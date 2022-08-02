@@ -74,9 +74,8 @@ func (n *NetboxError) Is(target error) bool {
 	return (n.msg == tar.msg || n.msg == "") && (n.errMsg == tar.errMsg || n.errMsg == "")
 }
 
-// ReadFromNetbox Function calls 3 helper functions which makes API calls to Netbox and sets Records field with required Hardware value
+// ReadFromNetbox Function calls 3 helper functions which makes API calls to Netbox and sets Records field with required Hardware value.
 func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToken string) error {
-
 	token := ValidationToken
 	netboxHost := Host
 
@@ -85,10 +84,9 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 
 	c := client.New(transport, nil)
 
-	//Get the devices list from netbox to populate the Machine values
+	// Get the devices list from netbox to populate the Machine values
 	deviceReq := dcim.NewDcimDevicesListParams()
 	err := n.ReadDevicesFromNetbox(ctx, c, deviceReq)
-
 	if err != nil {
 		return fmt.Errorf("cannot get Devices list: %v ", err)
 	}
@@ -96,7 +94,6 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 	err = n.ReadInterfacesFromNetbox(ctx, c)
 	if err != nil {
 		return fmt.Errorf("error reading Interfaces list: %v ", err)
-
 	}
 
 	// Get the Interfaces list from netbox to populate the Machine gateway and nameserver value
@@ -107,15 +104,13 @@ func (n *Netbox) ReadFromNetbox(ctx context.Context, Host string, ValidationToke
 
 	for _, machine := range n.Records {
 		n.logger.V(1).Info("Device Read: ", "Host", machine.Hostname, "IP", machine.IPAddress, "MAC", machine.MACAddress, "BMC-IP", machine.BMCIPAddress)
-
 	}
 
 	return nil
 }
 
-// ReadFromNetboxFiltered Function calls 3 helper functions with a filter tag which makes API calls to Netbox and sets Records field with required Hardware value
+// ReadFromNetboxFiltered Function calls 3 helper functions with a filter tag which makes API calls to Netbox and sets Records field with required Hardware value.
 func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, ValidationToken string, filterTag string) error {
-
 	token := ValidationToken
 	netboxHost := Host
 
@@ -124,7 +119,7 @@ func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, Valida
 
 	c := client.New(transport, nil)
 
-	//Get the devices list from netbox to populate the Machine values
+
 	deviceReq := dcim.NewDcimDevicesListParams()
 	deviceReq.Tag = &filterTag
 
@@ -132,14 +127,14 @@ func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, Valida
 	if err != nil {
 		return fmt.Errorf("could not get Devices list: %v", err)
 	}
-	//Get the Interfaces list from netbox to populate the Machine mac value
+
 	err = n.ReadInterfacesFromNetbox(ctx, c)
 
 	if err != nil {
 		return fmt.Errorf("error reading Interfaces list: %v ", err)
 	}
 
-	//Get the Interfaces list from netbox to populate the Machine gateway and nameserver value
+
 	ipamReq := ipam.NewIpamIPRangesListParams()
 	n.ReadIpRangeFromNetbox(ctx, c, ipamReq)
 
@@ -148,10 +143,9 @@ func (n *Netbox) ReadFromNetboxFiltered(ctx context.Context, Host string, Valida
 		n.logger.V(1).Info("Device Read: ", "Host", machine.Hostname, "IP", machine.IPAddress, "MAC", machine.MACAddress, "BMC-IP", machine.BMCIPAddress)
 	}
 	return nil
-
 }
 
-// CheckIp Function to check if a given ip address falls in between a start and end IP address
+// CheckIp Function to check if a given ip address falls in between a start and end IP address.
 func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, endIpRange string) bool {
 	startIp, _, err := net.ParseCIDR(startIpRange)
 	if err != nil {
@@ -167,7 +161,6 @@ func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, en
 
 	trial := net.ParseIP(ip)
 	if trial.To4() == nil {
-
 		n.logger.Error(err, "error parsing IP to IP4 address")
 		return false
 	}
@@ -179,9 +172,8 @@ func (n *Netbox) CheckIp(ctx context.Context, ip string, startIpRange string, en
 	return false
 }
 
-// ReadDevicesFromNetbox Function fetches the devices list from Netbox and sets HostName, BMC info, Ip addr, Disk and Labels
+// ReadDevicesFromNetbox Function fetches the devices list from Netbox and sets HostName, BMC info, Ip addr, Disk and Labels.
 func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBoxAPI, deviceReq *dcim.DcimDevicesListParams) error {
-
 	option := func(o *runtime.ClientOperation) {
 		o.Context = ctx
 	}
@@ -197,7 +189,7 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 		machine := new(Machine)
 		machine.Hostname = *device.Name
 
-		//Custom fields are returned as an interface by the API, type assertion to check for validity of the response
+
 		customFields, Ok := device.CustomFields.(map[string]interface{})
 		if !Ok {
 			return &TypeAssertError{"CustomFields", "map[string]interface{}", fmt.Sprintf("%T", device.CustomFields)}
@@ -205,9 +197,8 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 
 		bmcIPMap, Ok := customFields["bmc_ip"].(map[string]interface{})
 		if !Ok {
-
 			return &TypeAssertError{"bmc_ip", "map[string]interface{}", fmt.Sprintf("%T", customFields["bmc_ip"])}
-			//return fmt.Errorf("type Assertion error for BMC IP, %v", Ok)
+			// return fmt.Errorf("type Assertion error for BMC IP, %v", Ok)
 		}
 
 		bmcIPVal, Ok := bmcIPMap["address"].(string)
@@ -215,14 +206,14 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 			return &TypeAssertError{"bmc_ip_address", "string", fmt.Sprintf("%T", bmcIPMap["address"])}
 		}
 
-		//Check if the string returned in for bmc_ip is a valid IP.
+		// Check if the string returned in for bmc_ip is a valid IP.
 		bmcIPValAdd, bmcIPValMask, err := net.ParseCIDR(bmcIPVal)
 		if err != nil {
 			return &IpError{bmcIPVal}
 		}
 
 		machine.BMCIPAddress = bmcIPValAdd.String()
-		//Get the netmask for the machine using bmc_ip as the value also contains mask.
+
 		machine.Netmask = net.IP(bmcIPValMask.Mask).String()
 		bmcUserVal, Ok := customFields["bmc_username"].(string)
 		if !Ok {
@@ -242,10 +233,9 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 		}
 		machine.Disk = diskVal
 
-		//Obtain the machine IP from primary IP which contains IP/mask value
+		// Obtain the machine IP from primary IP which contains IP/mask value
 		machineIpAdd, _, err := net.ParseCIDR(*device.PrimaryIp4.Address)
 		if err != nil {
-
 			return &IpError{*device.PrimaryIp4.Address}
 			// return fmt.Errorf("cannot parse Machine IP Address, %v", err)
 		}
@@ -254,9 +244,7 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 		labelMap := make(map[string]string)
 		controlFlag := false
 		for _, tag := range device.Tags {
-
 			if *tag.Name == "control-plane" {
-
 				labelMap["type"] = "control-plane"
 				controlFlag = !controlFlag
 				break
@@ -273,9 +261,9 @@ func (n *Netbox) ReadDevicesFromNetbox(ctx context.Context, client *client.NetBo
 	return nil
 }
 
-// ReadInterfacesFromNetbox Function fetches the interfaces list from Netbox and sets the MAC address for each record
+// ReadInterfacesFromNetbox Function fetches the interfaces list from Netbox and sets the MAC address for each record.
 func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.NetBoxAPI) error {
-	//Get the Interfaces list from netbox to populate the Machine mac value
+	// Get the Interfaces list from netbox to populate the Machine mac value
 	interfacesReq := dcim.NewDcimInterfacesListParams()
 
 	option := func(o *runtime.ClientOperation) {
@@ -284,7 +272,6 @@ func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.Ne
 	for _, record := range n.Records {
 		interfacesReq.Device = &record.Hostname
 		interfacesRes, err := client.Dcim.DcimInterfacesList(interfacesReq, nil, option)
-
 		if err != nil {
 			return &NetboxError{"cannot get Interfaces list", err.Error()}
 		}
@@ -307,9 +294,8 @@ func (n *Netbox) ReadInterfacesFromNetbox(ctx context.Context, client *client.Ne
 	return nil
 }
 
-// ReadIpRangeFromNetbox Function fetches IP ranges from Netbox and sets the Gateway and nameserver address for each record
+// ReadIpRangeFromNetbox Function fetches IP ranges from Netbox and sets the Gateway and nameserver address for each record.
 func (n *Netbox) ReadIpRangeFromNetbox(ctx context.Context, client *client.NetBoxAPI, ipamReq *ipam.IpamIPRangesListParams) error {
-
 	option := func(o *runtime.ClientOperation) {
 		o.Context = ctx
 	}
@@ -321,7 +307,7 @@ func (n *Netbox) ReadIpRangeFromNetbox(ctx context.Context, client *client.NetBo
 
 	for _, record := range n.Records {
 		for _, ipRange := range ipam_payload.Results {
-			//Check if the IP of machine lies between the start and end address in the IP range. If so, update the nameserver and gateway value of the machine
+
 			if n.CheckIp(ctx, record.IPAddress, *ipRange.StartAddress, *ipRange.EndAddress) {
 				customFields, Ok := ipRange.CustomFields.(map[string]interface{})
 				if !Ok {
@@ -338,7 +324,7 @@ func (n *Netbox) ReadIpRangeFromNetbox(ctx context.Context, client *client.NetBo
 					return &TypeAssertError{"gatewayAddr", "string", fmt.Sprintf("%T", gatewayIpMap["address"])}
 				}
 
-				//Check if the string returned in for gatewayIpVal is a valid IP.
+
 				gatewayIpAdd, _, err := net.ParseCIDR(gatewayIpVal)
 				if err != nil {
 					return &IpError{gatewayIpVal}
@@ -362,8 +348,8 @@ func (n *Netbox) ReadIpRangeFromNetbox(ctx context.Context, client *client.NetBo
 						return &TypeAssertError{"nameserversIPMap", "string", fmt.Sprintf("%T", nameserversIpsMap["address"])}
 					}
 
-					//Parse CIDR reasoning and explanation about the type returned by netbox
-					//Check if string returned by nameserverIpVal is a valid IP.
+					// Parse CIDR reasoning and explanation about the type returned by netbox
+					// Check if string returned by nameserverIpVal is a valid IP.
 					nameserverIpAdd, _, err := net.ParseCIDR(nameserverIpVal)
 					if err != nil {
 						return &IpError{nameserverIpVal}

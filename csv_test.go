@@ -13,13 +13,13 @@ import (
 )
 
 func TestReadMachineBytes(t *testing.T) {
-
 	n := new(Netbox)
-	var machines = []*Machine{{Hostname: "Dev1", IPAddress: "10.80.8.21", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:F4:C1", Disk: "/dev/sda", Labels: map[string]string{"type": "worker-plane"}, BMCIPAddress: "10.80.12.20", BMCUsername: "root", BMCPassword: "pPyU6mAO"},
+	machines := []*Machine{
+		{Hostname: "Dev1", IPAddress: "10.80.8.21", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:F4:C1", Disk: "/dev/sda", Labels: map[string]string{"type": "worker-plane"}, BMCIPAddress: "10.80.12.20", BMCUsername: "root", BMCPassword: "pPyU6mAO"},
 		{Hostname: "Dev2", IPAddress: "10.80.8.22", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:EA:11", Disk: "/dev/sda", Labels: map[string]string{"type": "control-plane"}, BMCIPAddress: "10.80.12.21", BMCUsername: "root", BMCPassword: "pPyU6mAO"},
 	}
 	n.logger = logr.Discard()
-	machinesRawString := CreateMachineString(machines)
+	machinesRawString := createMachineString(machines)
 
 	// check happy flow by serializing machines
 	machinesUncorruptBytes := []byte(machinesRawString)
@@ -30,7 +30,7 @@ func TestReadMachineBytes(t *testing.T) {
 	}
 
 	// check unhappy flow by corrupting bytes i.e. swap first and last byte
-	var machinesCorruptBytes = machinesUncorruptBytes
+	machinesCorruptBytes := machinesUncorruptBytes
 	machinesCorruptBytes[0], machinesCorruptBytes[len(machinesCorruptBytes)-1] = machinesCorruptBytes[len(machinesCorruptBytes)-1], machinesCorruptBytes[0]
 	_, err := ReadMachinesBytes(context.TODO(), machinesCorruptBytes, n)
 	if err == nil {
@@ -39,7 +39,6 @@ func TestReadMachineBytes(t *testing.T) {
 }
 
 func TestWriteToCSV(t *testing.T) {
-
 	var machines = []*Machine{{Hostname: "eksa-dev01", IPAddress: "10.80.8.21", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:F4:C1", Disk: "/dev/sda", Labels: map[string]string{"type": "control-plane"}, BMCIPAddress: "10.80.12.20", BMCUsername: "root", BMCPassword: "root"},
 		{Hostname: "eksa-dev02", IPAddress: "10.80.8.22", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:EA:11", Disk: "/dev/sda", Labels: map[string]string{"type": "worker-plane"}, BMCIPAddress: "10.80.12.21", BMCUsername: "root", BMCPassword: "root"},
 	}
@@ -68,12 +67,10 @@ func TestWriteToCSV(t *testing.T) {
 	}
 }
 
-func CreateMachineString(machines []*Machine) string {
-
+func createMachineString(machines []*Machine) string {
 	var rawMachineString = `[`
 
 	for idx, m := range machines {
-
 		t := fmt.Sprintf(`
  {
   "Hostname": %q,
@@ -110,7 +107,7 @@ func TestExtractNameServers(t *testing.T) {
 		want string
 	}
 
-	var nsTests = []nsTest{
+	nsTests := []nsTest{
 		{[]string{"121.63.48.96", "121.63.58.96"}, "121.63.48.96|121.63.58.96"},
 		{[]string{"121.63.48.96", "121.63.58.96", "121.63.68.96"}, "121.63.48.96|121.63.58.96|121.63.68.96"},
 		{[]string{"", "121.63.58.96", "121.63.68.96"}, "|121.63.58.96|121.63.68.96"},

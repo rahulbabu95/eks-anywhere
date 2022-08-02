@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-// ReadMachinesBytes Function reads a byte array and converts it back to Machine Array
+// ReadMachinesBytes Function reads a byte array and converts it back to Machine Array.
 func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
 	var hardwareMachines []*Machine
 	err := json.Unmarshal(machines, &hardwareMachines)
@@ -16,12 +16,12 @@ func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Mach
 		return nil, fmt.Errorf("error unmarshalling the input byte stream: %v", err)
 	}
 
-	n.logger.V(1).Info("Deserealizing input stream succesful", "num_machines", len(hardwareMachines))
+	n.logger.V(1).Info("Deserealizing input stream successful", "num_machines", len(hardwareMachines))
 
 	return hardwareMachines, nil
 }
 
-// WriteToCSV Helper Function creates Error channel and context to cancel file writing on keyboard interrupt
+// WriteToCSV Helper Function creates Error channel and context to cancel file writing on keyboard interrupt.
 func WriteToCSV(ctx context.Context, machines []*Machine, n *Netbox) error {
 	errChan := make(chan error)
 	go writeToCSV(errChan, machines, n)
@@ -33,9 +33,9 @@ func WriteToCSV(ctx context.Context, machines []*Machine, n *Netbox) error {
 	}
 }
 
-// writeToCSV Function reads from slice of machines and writes to a hardware.csv file
+// writeToCSV Function reads from slice of machines and writes to a hardware.csv file.
 func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
-	//Create a csv file usign OS operations
+	// Create a csv file usign OS operations
 	file, err := os.Create("hardware.csv")
 	if err != nil {
 		errChan <- fmt.Errorf("error creating file: %v", err)
@@ -61,7 +61,7 @@ func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
 	errChan <- nil
 }
 
-// extractNameServers Function reads a slice of string and combines them with '|' separator
+// extractNameServers Function reads a slice of string and combines them with '|' separator.
 func extractNameServers(nameservers []string) string {
 	nsCombined := ""
 	for idx, ns := range nameservers {
