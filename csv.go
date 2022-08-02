@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-// Function reads a byte array and converts it back to Machine Array
+// ReadMachinesBytes Function reads a byte array and converts it back to Machine Array
 func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
 	var hardwareMachines []*Machine
 	err := json.Unmarshal(machines, &hardwareMachines)
