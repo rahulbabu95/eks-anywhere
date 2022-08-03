@@ -537,8 +537,13 @@ func TestReadIPRangeFromNetbox(t *testing.T) {
 		i := &mock{IP: dummyIPrangeListOk, err: tt.err}
 		c := &client.NetBoxAPI{Ipam: i}
 
+<<<<<<< HEAD
 		iPRangeReq := ipam.NewIpamIPRangesListParams()
 		err := n.readIPRangeFromNetbox(context.TODO(), c, iPRangeReq)
+=======
+		ipRangeReq := ipam.NewIpamIPRangesListParams()
+		err := n.readIpRangeFromNetbox(context.TODO(), c, ipRangeReq)
+>>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 
 		if err != nil {
 			if !errors.Is(err, tt.v.ifError) {
@@ -562,7 +567,7 @@ func TestSerializeMachines(t *testing.T) {
 	n := new(Netbox)
 	n.logger = logr.Discard()
 
-	got, err := n.SerializeMachines(test)
+	got, err := n.serializeMachines(test)
 	if err != nil {
 		t.Fatal("Error: ", err)
 	}
