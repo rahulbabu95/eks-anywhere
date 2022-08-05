@@ -23,7 +23,7 @@ func TestReadMachineBytes(t *testing.T) {
 
 	// check happy flow by serializing machines
 	machinesUncorruptBytes := []byte(machinesRawString)
-	machinesRead, _ := ReadMachinesBytes(context.TODO(), machinesUncorruptBytes, n)
+	machinesRead, _ := ReadMachinesBytes(machinesUncorruptBytes, n)
 
 	if diff := cmp.Diff(machines, machinesRead); diff != "" {
 		t.Fatal(diff)
@@ -32,43 +32,44 @@ func TestReadMachineBytes(t *testing.T) {
 	// check unhappy flow by corrupting bytes i.e. swap first and last byte
 	machinesCorruptBytes := machinesUncorruptBytes
 	machinesCorruptBytes[0], machinesCorruptBytes[len(machinesCorruptBytes)-1] = machinesCorruptBytes[len(machinesCorruptBytes)-1], machinesCorruptBytes[0]
-	_, err := ReadMachinesBytes(context.TODO(), machinesCorruptBytes, n)
+	_, err := ReadMachinesBytes(machinesCorruptBytes, n)
 	if err == nil {
 		t.Fatal()
 	}
 }
 
 func TestWriteToCSV(t *testing.T) {
-	var machines = []*Machine{{Hostname: "eksa-dev01", IPAddress: "10.80.8.21", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:F4:C1", Disk: "/dev/sda", Labels: map[string]string{"type": "control-plane"}, BMCIPAddress: "10.80.12.20", BMCUsername: "root", BMCPassword: "root"},
+	machines := []*Machine{
+		{Hostname: "eksa-dev01", IPAddress: "10.80.8.21", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:F4:C1", Disk: "/dev/sda", Labels: map[string]string{"type": "control-plane"}, BMCIPAddress: "10.80.12.20", BMCUsername: "root", BMCPassword: "root"},
 		{Hostname: "eksa-dev02", IPAddress: "10.80.8.22", Netmask: "255.255.255.0", Gateway: "192.168.2.1", Nameservers: []string{"1.1.1.1"}, MACAddress: "CC:48:3A:11:EA:11", Disk: "/dev/sda", Labels: map[string]string{"type": "worker-plane"}, BMCIPAddress: "10.80.12.21", BMCUsername: "root", BMCPassword: "root"},
 	}
-	exp_file, err := os.Open("testdata/results.csv")
+	expFile, err := os.Open("testdata/results.csv")
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := csv.NewReader(exp_file)
-	exp_records, _ := reader.ReadAll()
+	reader := csv.NewReader(expFile)
+	expRecords, _ := reader.ReadAll()
 	// errChan := make(chan error)
 	n := new(Netbox)
 	n.logger = logr.Discard()
-	WriteToCSV(context.TODO(), machines, n)
-	act_file, err := os.Open("hardware.csv")
+	writeToCSVHelper(context.TODO(), machines, n)
+	actFile, err := os.Open("hardware.csv")
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader2 := csv.NewReader(act_file)
-	act_records, _ := reader2.ReadAll()
-	for i := range act_records {
-		for j := range act_records[i] {
-			if diff := cmp.Diff(act_records[i][j], exp_records[i][j]); diff != "" {
-				t.Fatal("Field: ", act_records[0][j], diff)
+	reader2 := csv.NewReader(actFile)
+	actRecords, _ := reader2.ReadAll()
+	for i := range actRecords {
+		for j := range actRecords[i] {
+			if diff := cmp.Diff(actRecords[i][j], expRecords[i][j]); diff != "" {
+				t.Fatal("Field: ", actRecords[0][j], diff)
 			}
 		}
 	}
 }
 
 func createMachineString(machines []*Machine) string {
-	var rawMachineString = `[`
+	rawMachineString := `[`
 
 	for idx, m := range machines {
 		t := fmt.Sprintf(`

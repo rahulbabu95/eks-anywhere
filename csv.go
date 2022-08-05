@@ -9,7 +9,7 @@ import (
 )
 
 // ReadMachinesBytes Function reads a byte array and converts it back to Machine Array.
-func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
+func ReadMachinesBytes(machines []byte, n *Netbox) ([]*Machine, error) {
 	var hardwareMachines []*Machine
 	err := json.Unmarshal(machines, &hardwareMachines)
 	if err != nil {
@@ -22,7 +22,7 @@ func ReadMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Mach
 }
 
 // WriteToCSV Helper Function creates Error channel and context to cancel file writing on keyboard interrupt.
-func WriteToCSV(ctx context.Context, machines []*Machine, n *Netbox) error {
+func writeToCSVHelper(ctx context.Context, machines []*Machine, n *Netbox) error {
 	errChan := make(chan error)
 	go writeToCSV(errChan, machines, n)
 	select {
@@ -55,7 +55,11 @@ func writeToCSV(errChan chan error, machines []*Machine, n *Netbox) {
 		row := []string{machine.Hostname, machine.BMCIPAddress, machine.BMCUsername, machine.BMCPassword, machine.MACAddress, machine.IPAddress, machine.Netmask, machine.Gateway, nsCombined, "type=" + machine.Labels["type"], machine.Disk}
 		machinesString = append(machinesString, row)
 	}
-	writer.WriteAll(machinesString)
+	err = writer.WriteAll(machinesString)
+	if err != nil {
+		errChan <- fmt.Errorf("error writing to file: %v", err)
+		return
+	}
 	mydir, _ := os.Getwd()
 	n.logger.V(1).Info("Write to csv successful", "path_to_file", mydir+"/hardware.csv")
 	errChan <- nil

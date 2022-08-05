@@ -15,11 +15,9 @@ import (
 func runClient(ctx context.Context, host string, token string, tag string, debug bool) error {
 	n := new(Netbox)
 
-	// token := "0123456789abcdef0123456789abcdef01234567"
-	// host := "localhost:8000"
 	n.logger = defaultLogger(debug)
 
-	err := n.ReadFromNetboxFiltered(ctx, host, token, tag)
+	err := n.readFromNetboxFiltered(ctx, host, token, tag)
 	if err != nil {
 		return fmt.Errorf("filtered Read from Netbox failed: %v", err)
 	}
@@ -28,13 +26,13 @@ func runClient(ctx context.Context, host string, token string, tag string, debug
 	if err2 != nil {
 		return fmt.Errorf("error serializing machines: %v", err2)
 	}
-	machines, err3 := ReadMachinesBytes(ctx, ret, n)
+	machines, err3 := ReadMachinesBytes(ret, n)
 	if err3 != nil {
 		return fmt.Errorf("error reading Bytes: %v", err3)
 	}
 	n.logger.Info("All API calls done")
 	time.Sleep(time.Second)
-	err = WriteToCSV(ctx, machines, n)
+	err = writeToCSVHelper(ctx, machines, n)
 	if err != nil {
 		return fmt.Errorf("error writing to csv: %v", err)
 	}
