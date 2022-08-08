@@ -2,10 +2,10 @@ name: Test and Build
 on:
   push:
     branches:
-      - main
+      - netbox-hardware-ingest
   pull_request:
     branches:
-      - main
+      - netbox-hardware-ingest
 
 jobs:
   validation:
