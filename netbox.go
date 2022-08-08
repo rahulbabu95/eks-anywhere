@@ -74,31 +74,16 @@ func (n *NetboxError) Is(target error) bool {
 	return (n.msg == tar.msg || n.msg == "") && (n.errMsg == tar.errMsg || n.errMsg == "")
 }
 
-<<<<<<< HEAD
 // ReadFromNetbox Function calls 3 helper functions which makes API calls to Netbox and sets Records field with required Hardware value.
 func (n *Netbox) ReadFromNetbox(ctx context.Context, host string, validationToKen string) error {
 	transport := httptransport.New(host, client.DefaultBasePath, []string{"http"})
 	transport.DefaultAuthentication = httptransport.APIKeyAuth("Authorization", "header", "ToKen "+validationToKen)
-=======
-// readFromNetbox Function calls 3 helper functions which makes API calls to Netbox and sets Records field with required Hardware value
-func (n *Netbox) readFromNetbox(ctx context.Context, Host string, ValidationToken string) error {
-
-	token := ValidationToken
-	netboxHost := Host
-
-	transport := httptransport.New(netboxHost, client.DefaultBasePath, []string{"http"})
-	transport.DefaultAuthentication = httptransport.APIKeyAuth("Authorization", "header", "Token "+token)
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 
 	c := client.New(transport, nil)
 
 	// Get the devices list from netbox to populate the Machine values
 	deviceReq := dcim.NewDcimDevicesListParams()
 	err := n.readDevicesFromNetbox(ctx, c, deviceReq)
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	if err != nil {
 		return fmt.Errorf("cannot get Devices list: %v ", err)
 	}
@@ -110,15 +95,10 @@ func (n *Netbox) readFromNetbox(ctx context.Context, Host string, ValidationToke
 
 	// Get the Interfaces list from netbox to populate the Machine gateway and nameserver value
 	ipamReq := ipam.NewIpamIPRangesListParams()
-<<<<<<< HEAD
 	err = n.readIPRangeFromNetbox(ctx, c, ipamReq)
 	if err != nil {
 		return fmt.Errorf("error reading IP ranges list: %v ", err)
 	}
-=======
-	n.readIpRangeFromNetbox(ctx, c, ipamReq)
-
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	n.logger.V(1).Info("ALL DEVICES")
 
 	for _, machine := range n.Records {
@@ -128,7 +108,6 @@ func (n *Netbox) readFromNetbox(ctx context.Context, Host string, ValidationToke
 	return nil
 }
 
-<<<<<<< HEAD
 // rd Function calls 3 helper functions with a filter tag which makes API calls to Netbox and sets Records field with required Hardware value.
 func (n *Netbox) readFromNetboxFiltered(ctx context.Context, host string, validationToKen string, filterTag string) error {
 	transport := httptransport.New(host, client.DefaultBasePath, []string{"http"})
@@ -136,20 +115,6 @@ func (n *Netbox) readFromNetboxFiltered(ctx context.Context, host string, valida
 
 	c := client.New(transport, nil)
 
-=======
-// readFromNetboxFiltered Function calls 3 helper functions with a filter tag which makes API calls to Netbox and sets Records field with required Hardware value
-func (n *Netbox) readFromNetboxFiltered(ctx context.Context, Host string, ValidationToken string, filterTag string) error {
-
-	token := ValidationToken
-	netboxHost := Host
-
-	transport := httptransport.New(netboxHost, client.DefaultBasePath, []string{"http"})
-	transport.DefaultAuthentication = httptransport.APIKeyAuth("Authorization", "header", "Token "+token)
-
-	c := client.New(transport, nil)
-
-	//Get the devices list from netbox to populate the Marhine values
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	deviceReq := dcim.NewDcimDevicesListParams()
 	deviceReq.Tag = &filterTag
 
@@ -157,11 +122,6 @@ func (n *Netbox) readFromNetboxFiltered(ctx context.Context, Host string, Valida
 	if err != nil {
 		return fmt.Errorf("could not get Devices list: %v", err)
 	}
-<<<<<<< HEAD
-
-=======
-	//Get the Interfaces list from netbox to populate the Machine mac value
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	err = n.readInterfacesFromNetbox(ctx, c)
 
 	if err != nil {
@@ -169,15 +129,10 @@ func (n *Netbox) readFromNetboxFiltered(ctx context.Context, Host string, Valida
 	}
 
 	ipamReq := ipam.NewIpamIPRangesListParams()
-<<<<<<< HEAD
 	err = n.readIPRangeFromNetbox(ctx, c, ipamReq)
 	if err != nil {
 		return fmt.Errorf("error reading IP ranges list: %v ", err)
 	}
-=======
-	n.readIpRangeFromNetbox(ctx, c, ipamReq)
-
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	n.logger.V(1).Info("FILTERED DEVICES")
 	for _, machine := range n.Records {
 		n.logger.V(1).Info("Device Read: ", "Host", machine.Hostname, "IP", machine.IPAddress, "MAC", machine.MACAddress, "BMC-IP", machine.BMCIPAddress)
@@ -185,15 +140,9 @@ func (n *Netbox) readFromNetboxFiltered(ctx context.Context, Host string, Valida
 	return nil
 }
 
-<<<<<<< HEAD
 // checkIP Function to check if a given ip address falls in between a start and end IP address.
 func (n *Netbox) checkIP(ip string, startIPRange string, endIPRange string) bool {
 	startIP, _, err := net.ParseCIDR(startIPRange)
-=======
-// checkIp Function to check if a given ip address falls in between a start and end IP address
-func (n *Netbox) checkIp(ctx context.Context, ip string, startIpRange string, endIpRange string) bool {
-	startIp, _, err := net.ParseCIDR(startIpRange)
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	if err != nil {
 		n.logger.Error(err, "error parsing IP in start range")
 		return false
@@ -218,14 +167,8 @@ func (n *Netbox) checkIp(ctx context.Context, ip string, startIpRange string, en
 	return false
 }
 
-<<<<<<< HEAD
 // readDevicesFromNetbox Function fetches the devices list from Netbox and sets HostName, BMC info, Ip addr, Disk and Labels.
 func (n *Netbox) readDevicesFromNetbox(ctx context.Context, c *client.NetBoxAPI, deviceReq *dcim.DcimDevicesListParams) error {
-=======
-// readDevicesFromNetbox Function fetches the revices list from Netbox and sets HostName, BMC info, Ip addr, Disk and Labels
-func (n *Netbox) readDevicesFromNetbox(ctx context.Context, client *client.NetBoxAPI, deviceReq *dcim.DcimDevicesListParams) error {
-
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	option := func(o *runtime.ClientOperation) {
 		o.Context = ctx
 	}
@@ -312,15 +255,9 @@ func (n *Netbox) readDevicesFromNetbox(ctx context.Context, client *client.NetBo
 	return nil
 }
 
-<<<<<<< HEAD
 // ReadInterfacesFromNetbox Function fetches the interfaces list from Netbox and sets the MAC address for each record.
 func (n *Netbox) readInterfacesFromNetbox(ctx context.Context, c *client.NetBoxAPI) error {
 	// Get the Interfaces list from netbox to populate the Machine mac value
-=======
-// readInterfacesFromNetbox Function fetches the interfaces list from Netbox and sets the MAC address for each record
-func (n *Netbox) readInterfacesFromNetbox(ctx context.Context, client *client.NetBoxAPI) error {
-	//Get the Interfaces list from netbox to populate the Machine mac value
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	interfacesReq := dcim.NewDcimInterfacesListParams()
 
 	option := func(o *runtime.ClientOperation) {
@@ -351,14 +288,8 @@ func (n *Netbox) readInterfacesFromNetbox(ctx context.Context, client *client.Ne
 	return nil
 }
 
-<<<<<<< HEAD
 // ReadIpRangeFromNetbox Function fetches IP ranges from Netbox and sets the Gateway and nameserver address for each record.
 func (n *Netbox) readIPRangeFromNetbox(ctx context.Context, c *client.NetBoxAPI, ipamReq *ipam.IpamIPRangesListParams) error {
-=======
-// readIpRangeFromNetbox Function fetches IP ranges from Netbox and sets the Gateway and nameserver address for each record
-func (n *Netbox) readIpRangeFromNetbox(ctx context.Context, client *client.NetBoxAPI, ipamReq *ipam.IpamIPRangesListParams) error {
-
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	option := func(o *runtime.ClientOperation) {
 		o.Context = ctx
 	}
@@ -369,19 +300,11 @@ func (n *Netbox) readIpRangeFromNetbox(ctx context.Context, client *client.NetBo
 	ipamPayload := ipamRes.GetPayload()
 
 	for _, record := range n.Records {
-<<<<<<< HEAD
 		for _, ipRange := range ipamPayload.Results {
 			// nolint: nestif // Check for ip for optimization
 			if n.checkIP(record.IPAddress, *ipRange.StartAddress, *ipRange.EndAddress) {
 				customFields, oK := ipRange.CustomFields.(map[string]interface{})
 				if !oK {
-=======
-		for _, ipRange := range ipam_payload.Results {
-			//Check if the IP of machine lies between the start and end address in the IP range. If so, update the nameserver and gateway value of the machine
-			if n.checkIp(ctx, record.IPAddress, *ipRange.StartAddress, *ipRange.EndAddress) {
-				customFields, Ok := ipRange.CustomFields.(map[string]interface{})
-				if !Ok {
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 					return &TypeAssertError{"customFields", "map[string]interface{}", fmt.Sprintf("%T", ipRange.CustomFields)}
 				}
 
