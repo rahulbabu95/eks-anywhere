@@ -23,7 +23,7 @@ func TestReadMachineBytes(t *testing.T) {
 
 	// check happy flow by serializing machines
 	machinesUncorruptBytes := []byte(machinesRawString)
-	machinesRead, _ := ReadMachinesBytes(machinesUncorruptBytes, n)
+	machinesRead, _ := readMachineBytes(machinesUncorruptBytes, n)
 
 	if diff := cmp.Diff(machines, machinesRead); diff != "" {
 		t.Fatal(diff)
@@ -32,7 +32,7 @@ func TestReadMachineBytes(t *testing.T) {
 	// check unhappy flow by corrupting bytes i.e. swap first and last byte
 	machinesCorruptBytes := machinesUncorruptBytes
 	machinesCorruptBytes[0], machinesCorruptBytes[len(machinesCorruptBytes)-1] = machinesCorruptBytes[len(machinesCorruptBytes)-1], machinesCorruptBytes[0]
-	_, err := ReadMachinesBytes(machinesCorruptBytes, n)
+	_, err := readMachineBytes(machinesCorruptBytes, n)
 	if err == nil {
 		t.Fatal()
 	}

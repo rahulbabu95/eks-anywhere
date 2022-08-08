@@ -8,8 +8,8 @@ import (
 	"os"
 )
 
-// ReadMachinesBytes Function reads a byte array and converts it back to Machine Array.
-func ReadMachinesBytes(machines []byte, n *Netbox) ([]*Machine, error) {
+// readMachineBytes Function reads a byte array and converts it back to Machine Array.
+func readMachineBytes(machines []byte, n *Netbox) ([]*Machine, error) {
 	var hardwareMachines []*Machine
 	err := json.Unmarshal(machines, &hardwareMachines)
 	if err != nil {

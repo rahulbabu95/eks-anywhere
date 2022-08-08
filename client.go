@@ -25,7 +25,7 @@ func runClient(ctx context.Context, host string, token string, tag string, debug
 	if err != nil {
 		return fmt.Errorf("error serializing machines: %v", err)
 	}
-	machines, err3 := ReadMachinesBytes(ret, n)
+	machines, err3 := readMachineBytes(ret, n)
 	if err3 != nil {
 		return fmt.Errorf("error reading Bytes: %v", err3)
 	}
