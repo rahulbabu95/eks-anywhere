@@ -10,7 +10,7 @@ Currently, the supported DCIM tool is Netbox.
 
 CLI:
 
-<img width="484" alt="Screen Shot 2022-08-02 at 1 51 19 PM" src="https://user-images.githubusercontent.com/31204974/182446659-607e1df6-a169-4ed3-b90b-80230394bf8c.png">
+![image](docs/hardware-ingest-description.png)
 
 
 ## Context
