@@ -19,3 +19,10 @@ hardware-manifests/
 *.env
 support-bundle*
 /.ignore
+
+# added by lint-install
+out/
+coverage.out
+coverage.html
+hardware.csv
+hardware-ingest

@@ -45,6 +45,7 @@ func (l Labels) Get(k string) string {
 	return l[k]
 }
 
+// nolint: unparam // Satisfying an interface
 func (l *Labels) MarshalCSV() (string, error) {
 	return l.String(), nil
 }
@@ -91,6 +92,7 @@ func (n *Nameservers) String() string {
 }
 
 // UnmarshalCSV unmarshalls s where is is a list of nameservers separated by NameserversSeparator.
+// nolint: unparam // Satisfying an interface
 func (n *Nameservers) UnmarshalCSV(s string) error {
 	servers := strings.Split(s, NameserversSeparator)
 	*n = append(*n, servers...)
@@ -98,6 +100,7 @@ func (n *Nameservers) UnmarshalCSV(s string) error {
 }
 
 // MarshalCSV marshalls Nameservers into a string list of nameservers separated by NameserversSeparator.
+// nolint: unparam // Satisfying an interface
 func (n *Nameservers) MarshalCSV() (string, error) {
 	return n.String(), nil
 }
