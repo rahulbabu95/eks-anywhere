@@ -122,7 +122,6 @@ func (n *Netbox) readFromNetboxFiltered(ctx context.Context, host string, valida
 	if err != nil {
 		return fmt.Errorf("could not get Devices list: %v", err)
 	}
-
 	err = n.readInterfacesFromNetbox(ctx, c)
 
 	if err != nil {
@@ -193,7 +192,6 @@ func (n *Netbox) readDevicesFromNetbox(ctx context.Context, c *client.NetBoxAPI,
 		bmcIPMap, oK := customFields["bmc_ip"].(map[string]interface{})
 		if !oK {
 			return &TypeAssertError{"bmc_ip", "map[string]interface{}", fmt.Sprintf("%T", customFields["bmc_ip"])}
-
 		}
 
 		bmcIPVal, oK := bmcIPMap["address"].(string)
@@ -362,8 +360,8 @@ func (n *Netbox) readIPRangeFromNetbox(ctx context.Context, c *client.NetBoxAPI,
 	return nil
 }
 
-// SerializeMachines Function takes in a arry of machine slices as input and converts them into byte array.
-func (n *Netbox) SerializeMachines(machines []*Machine) ([]byte, error) {
+// serializeMachines Function takes in a arry of machine slices as input and converts them into byte array.
+func (n *Netbox) serializeMachines(machines []*Machine) ([]byte, error) {
 	ret, err := json.MarshalIndent(machines, "", " ")
 	if err != nil {
 		return nil, fmt.Errorf("error in encoding Machines to byte Array: %v", err)

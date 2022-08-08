@@ -204,7 +204,6 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 					t.Fatal(diff)
 				}
 			}
-
 		})
 	}
 }
@@ -306,7 +305,6 @@ func TestReadInterfacesFromNetbox(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }
 
@@ -562,7 +560,7 @@ func TestSerializeMachines(t *testing.T) {
 	n := new(Netbox)
 	n.logger = logr.Discard()
 
-	got, err := n.SerializeMachines(test)
+	got, err := n.serializeMachines(test)
 	if err != nil {
 		t.Fatal("Error: ", err)
 	}

@@ -14,7 +14,6 @@ import (
 // runClient Orchestrates all the business logic and calls relevant functions to return the csv file.
 func runClient(ctx context.Context, host string, token string, tag string, debug bool) error {
 	n := new(Netbox)
-
 	n.logger = defaultLogger(debug)
 
 	err := n.readFromNetboxFiltered(ctx, host, token, tag)
@@ -22,11 +21,11 @@ func runClient(ctx context.Context, host string, token string, tag string, debug
 		return fmt.Errorf("filtered Read from Netbox failed: %v", err)
 	}
 	time.Sleep(time.Second)
-	ret, err2 := n.SerializeMachines(n.Records)
-	if err2 != nil {
-		return fmt.Errorf("error serializing machines: %v", err2)
+	ret, err := n.serializeMachines(n.Records)
+	if err != nil {
+		return fmt.Errorf("error serializing machines: %v", err)
 	}
-	machines, err3 := ReadMachinesBytes(ret, n)
+	machines, err3 := readMachineBytes(ret, n)
 	if err3 != nil {
 		return fmt.Errorf("error reading Bytes: %v", err3)
 	}
