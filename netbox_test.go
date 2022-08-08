@@ -170,39 +170,42 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		n := new(Netbox)
-		n.logger = logr.Discard()
-		d := new(models.DeviceWithConfigContext)
-		d.Tags = []*models.NestedTag{{Name: &tt.v.label}}
-		d.Name = toPointer(tt.v.name)
-		d.CustomFields = map[string]interface{}{
-			"bmc_IP":       map[string]interface{}{"address": tt.v.bmcIP},
-			"bmc_username": tt.v.bmcUsername,
-			"bmc_password": tt.v.bmcPassword,
-			"disk":         tt.v.disk,
-		}
-		d.PrimaryIp4 = &models.NestedIPAddress{Address: toPointer(tt.v.primIP)}
-		dummyDevListOK := new(dcim.DcimDevicesListOK)
-		dummyDevListOKBody := new(dcim.DcimDevicesListOKBody)
-
-		// dummyDevListOK.Payload = new(models.Device)
-		dummyDevListOKBody.Results = []*models.DeviceWithConfigContext{d}
-		dummyDevListOK.Payload = dummyDevListOKBody
-		v := &mock{v: dummyDevListOK, err: tt.err}
-		c := &client.NetBoxAPI{Dcim: v}
-		deviceReq := dcim.NewDcimDevicesListParams()
-		err := n.readDevicesFromNetbox(context.TODO(), c, deviceReq)
-
-		if err != nil {
-			if !errors.Is(err, tt.v.ifError) {
-				t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
+	for idx, tt := range tests {
+		t.Run(fmt.Sprintf("%v", idx), func(t *testing.T) {
+			n := new(Netbox)
+			n.logger = logr.Discard()
+			d := new(models.DeviceWithConfigContext)
+			d.Tags = []*models.NestedTag{{Name: &tt.v.label}}
+			d.Name = toPointer(tt.v.name)
+			d.CustomFields = map[string]interface{}{
+				"bmc_ip":       map[string]interface{}{"address": tt.v.bmcIP},
+				"bmc_username": tt.v.bmcUsername,
+				"bmc_password": tt.v.bmcPassword,
+				"disk":         tt.v.disk,
 			}
-		} else {
-			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
-				t.Fatal(diff)
+			d.PrimaryIp4 = &models.NestedIPAddress{Address: toPointer(tt.v.primIP)}
+			dummyDevListOK := new(dcim.DcimDevicesListOK)
+			dummyDevListOKBody := new(dcim.DcimDevicesListOKBody)
+
+			// dummyDevListOK.Payload = new(models.Device)
+			dummyDevListOKBody.Results = []*models.DeviceWithConfigContext{d}
+			dummyDevListOK.Payload = dummyDevListOKBody
+			v := &mock{v: dummyDevListOK, err: tt.err}
+			c := &client.NetBoxAPI{Dcim: v}
+			deviceReq := dcim.NewDcimDevicesListParams()
+			err := n.readDevicesFromNetbox(context.TODO(), c, deviceReq)
+
+			if err != nil {
+				if !errors.Is(err, tt.v.ifError) {
+					t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
+				}
+			} else {
+				if diff := cmp.Diff(n.Records, tt.want); diff != "" {
+					t.Fatal(diff)
+				}
 			}
-		}
+
+		})
 	}
 }
 
@@ -262,46 +265,48 @@ func TestReadInterfacesFromNetbox(t *testing.T) {
 			err: errors.New("error code 500-Internal Server Error"), want: []*Machine{},
 		},
 	}
-	for _, tt := range tests {
-		n := new(Netbox)
-		dummyMachine := &Machine{
-			Hostname: tt.v.device,
-		}
-
-		n.Records = append(n.Records, dummyMachine)
-		n.logger = logr.Discard()
-
-		dummyInterfaceList := make([]*models.Interface, len(tt.v.MacAddress))
-		for idx := range tt.v.MacAddress {
-			i := new(models.Interface)
-			i.Name = &tt.v.Name[idx]
-
-			i.MacAddress = &tt.v.MacAddress[idx]
-			if idx == tt.v.Tag {
-				i.Tags = []*models.NestedTag{{Name: toPointer("eks-a")}}
+	for idx, tt := range tests {
+		t.Run(fmt.Sprintf("%v", idx), func(t *testing.T) {
+			n := new(Netbox)
+			dummyMachine := &Machine{
+				Hostname: tt.v.device,
 			}
-			dummyInterfaceList[idx] = i
-		}
 
-		dummyIntListOK := new(dcim.DcimInterfacesListOK)
-		dummyIntListOKBody := new(dcim.DcimInterfacesListOKBody)
-		dummyIntListOKBody.Results = dummyInterfaceList
-		dummyIntListOK.Payload = dummyIntListOKBody
-		i := &mock{i: dummyIntListOK, err: tt.err}
-		c := &client.NetBoxAPI{Dcim: i}
+			n.Records = append(n.Records, dummyMachine)
+			n.logger = logr.Discard()
 
-		err := n.readInterfacesFromNetbox(context.TODO(), c)
+			dummyInterfaceList := make([]*models.Interface, len(tt.v.MacAddress))
+			for idx := range tt.v.MacAddress {
+				i := new(models.Interface)
+				i.Name = &tt.v.Name[idx]
 
-		if err != nil {
-			if !errors.Is(err, tt.v.ifError) {
-				t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
+				i.MacAddress = &tt.v.MacAddress[idx]
+				if idx == tt.v.Tag {
+					i.Tags = []*models.NestedTag{{Name: toPointer("eks-a")}}
+				}
+				dummyInterfaceList[idx] = i
 			}
-		} else {
-			fmt.Println(n.Records)
-			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
-				t.Fatal(diff)
+
+			dummyIntListOK := new(dcim.DcimInterfacesListOK)
+			dummyIntListOKBody := new(dcim.DcimInterfacesListOKBody)
+			dummyIntListOKBody.Results = dummyInterfaceList
+			dummyIntListOK.Payload = dummyIntListOKBody
+			i := &mock{i: dummyIntListOK, err: tt.err}
+			c := &client.NetBoxAPI{Dcim: i}
+
+			err := n.readInterfacesFromNetbox(context.TODO(), c)
+
+			if err != nil {
+				if !errors.Is(err, tt.v.ifError) {
+					t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
+				}
+			} else {
+				if diff := cmp.Diff(n.Records, tt.want); diff != "" {
+					t.Fatal(diff)
+				}
 			}
-		}
+		})
+
 	}
 }
 
@@ -331,7 +336,7 @@ func TestTypeAssertions(t *testing.T) {
 				name:        "dev",
 				primIP:      "192.18.2.5/22",
 			},
-			err: nil, want: &TypeAssertError{"bmc_IP", "map[string]interface{}", "string"},
+			err: nil, want: &TypeAssertError{"bmc_ip", "map[string]interface{}", "string"},
 		},
 		{
 			v: outputs{
@@ -342,7 +347,7 @@ func TestTypeAssertions(t *testing.T) {
 				name:        "dev",
 				primIP:      "192.18.2.5/22",
 			},
-			err: nil, want: &TypeAssertError{"bmc_IP_address", "string", "float64"},
+			err: nil, want: &TypeAssertError{"bmc_ip_address", "string", "float64"},
 		},
 		{
 			v: outputs{
@@ -379,38 +384,40 @@ func TestTypeAssertions(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		n := new(Netbox)
-		n.logger = logr.Discard()
-		d := new(models.DeviceWithConfigContext)
-		d.Name = toPointer(tt.v.name)
+	for idx, tt := range tests {
+		t.Run(fmt.Sprintf("%v", idx), func(t *testing.T) {
+			n := new(Netbox)
+			n.logger = logr.Discard()
+			d := new(models.DeviceWithConfigContext)
+			d.Name = toPointer(tt.v.name)
 
-		d.CustomFields = map[string]interface{}{
-			"bmc_IP":       tt.v.bmcIP,
-			"bmc_username": tt.v.bmcUsername,
-			"bmc_password": tt.v.bmcPassword,
-			"disk":         tt.v.disk,
-		}
-		d.PrimaryIp4 = &models.NestedIPAddress{Address: toPointer(tt.v.primIP)}
-		dummyDevListOK := new(dcim.DcimDevicesListOK)
-		dummyDevListOKBody := new(dcim.DcimDevicesListOKBody)
-
-		dummyDevListOKBody.Results = []*models.DeviceWithConfigContext{d}
-		dummyDevListOK.Payload = dummyDevListOKBody
-		v := &mock{v: dummyDevListOK, err: tt.err}
-		c := &client.NetBoxAPI{Dcim: v}
-		deviceReq := dcim.NewDcimDevicesListParams()
-		err := n.readDevicesFromNetbox(context.TODO(), c, deviceReq)
-
-		if err != nil {
-			if !errors.Is(err, tt.want) {
-				t.Fatal("Got: ", err.Error(), "want: ", tt.want)
+			d.CustomFields = map[string]interface{}{
+				"bmc_ip":       tt.v.bmcIP,
+				"bmc_username": tt.v.bmcUsername,
+				"bmc_password": tt.v.bmcPassword,
+				"disk":         tt.v.disk,
 			}
-		} else {
-			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
-				t.Fatal(diff)
+			d.PrimaryIp4 = &models.NestedIPAddress{Address: toPointer(tt.v.primIP)}
+			dummyDevListOK := new(dcim.DcimDevicesListOK)
+			dummyDevListOKBody := new(dcim.DcimDevicesListOKBody)
+
+			dummyDevListOKBody.Results = []*models.DeviceWithConfigContext{d}
+			dummyDevListOK.Payload = dummyDevListOKBody
+			v := &mock{v: dummyDevListOK, err: tt.err}
+			c := &client.NetBoxAPI{Dcim: v}
+			deviceReq := dcim.NewDcimDevicesListParams()
+			err := n.readDevicesFromNetbox(context.TODO(), c, deviceReq)
+
+			if err != nil {
+				if !errors.Is(err, tt.want) {
+					t.Fatalf("Got: %v, want: %v", err.Error(), tt.want)
+				}
+			} else {
+				if diff := cmp.Diff(n.Records, tt.want); diff != "" {
+					t.Fatal(diff)
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -538,7 +545,6 @@ func TestReadIPRangeFromNetbox(t *testing.T) {
 				t.Fatal("Got: ", err.Error(), "want: ", tt.v.ifError)
 			}
 		} else {
-			fmt.Println(n.Records)
 			if diff := cmp.Diff(n.Records, tt.want); diff != "" {
 				t.Fatal(diff)
 			}
