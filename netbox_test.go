@@ -204,7 +204,6 @@ func TestReadDevicesFromNetbox(t *testing.T) {
 					t.Fatal(diff)
 				}
 			}
-
 		})
 	}
 }
@@ -306,7 +305,6 @@ func TestReadInterfacesFromNetbox(t *testing.T) {
 				}
 			}
 		})
-
 	}
 }
 

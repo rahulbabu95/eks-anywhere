@@ -192,7 +192,6 @@ func (n *Netbox) readDevicesFromNetbox(ctx context.Context, c *client.NetBoxAPI,
 		bmcIPMap, oK := customFields["bmc_ip"].(map[string]interface{})
 		if !oK {
 			return &TypeAssertError{"bmc_ip", "map[string]interface{}", fmt.Sprintf("%T", customFields["bmc_ip"])}
-
 		}
 
 		bmcIPVal, oK := bmcIPMap["address"].(string)
