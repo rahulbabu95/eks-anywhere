@@ -8,13 +8,8 @@ import (
 	"os"
 )
 
-<<<<<<< HEAD
 // ReadMachinesBytes Function reads a byte array and converts it back to Machine Array.
 func ReadMachinesBytes(machines []byte, n *Netbox) ([]*Machine, error) {
-=======
-// readMachinesBytes Function reads a byte array and converts it back to Machine Array
-func readMachinesBytes(ctx context.Context, machines []byte, n *Netbox) ([]*Machine, error) {
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	var hardwareMachines []*Machine
 	err := json.Unmarshal(machines, &hardwareMachines)
 	if err != nil {

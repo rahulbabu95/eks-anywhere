@@ -23,11 +23,7 @@ func TestReadMachineBytes(t *testing.T) {
 
 	// check happy flow by serializing machines
 	machinesUncorruptBytes := []byte(machinesRawString)
-<<<<<<< HEAD
 	machinesRead, _ := ReadMachinesBytes(machinesUncorruptBytes, n)
-=======
-	machinesRead, _ := readMachinesBytes(context.TODO(), machinesUncorruptBytes, n)
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 
 	if diff := cmp.Diff(machines, machinesRead); diff != "" {
 		t.Fatal(diff)
@@ -36,11 +32,7 @@ func TestReadMachineBytes(t *testing.T) {
 	// check unhappy flow by corrupting bytes i.e. swap first and last byte
 	machinesCorruptBytes := machinesUncorruptBytes
 	machinesCorruptBytes[0], machinesCorruptBytes[len(machinesCorruptBytes)-1] = machinesCorruptBytes[len(machinesCorruptBytes)-1], machinesCorruptBytes[0]
-<<<<<<< HEAD
 	_, err := ReadMachinesBytes(machinesCorruptBytes, n)
-=======
-	_, err := readMachinesBytes(context.TODO(), machinesCorruptBytes, n)
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	if err == nil {
 		t.Fatal()
 	}
@@ -60,7 +52,6 @@ func TestWriteToCSV(t *testing.T) {
 	// errChan := make(chan error)
 	n := new(Netbox)
 	n.logger = logr.Discard()
-<<<<<<< HEAD
 	writeToCSVHelper(context.TODO(), machines, n)
 	actFile, err := os.Open("hardware.csv")
 	if err != nil {
@@ -74,30 +65,11 @@ func TestWriteToCSV(t *testing.T) {
 				t.Fatal("Field: ", actRecords[0][j], diff)
 			}
 		}
-=======
-	err = WriteToCSV(context.TODO(), machines, n)
-	if err != nil {
-		t.Fatal(err)
-	}
-	act_file, err := os.Open("hardware.csv")
-	if err != nil {
-		t.Fatal(err)
-	}
-	reader2 := csv.NewReader(act_file)
-	act_records, _ := reader2.ReadAll()
-	if diff := cmp.Diff(act_records, exp_records); diff != "" {
-		t.Fatal(diff)
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 	}
 }
 
 func createMachineString(machines []*Machine) string {
-<<<<<<< HEAD
 	rawMachineString := `[`
-=======
-
-	var rawMachineString = `[`
->>>>>>> 9c3512e4 (Unexported functions, reused err variable in client.go)
 
 	for idx, m := range machines {
 		t := fmt.Sprintf(`
