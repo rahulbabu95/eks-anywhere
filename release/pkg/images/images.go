@@ -258,7 +258,8 @@ func GetReleaseImageURI(r *releasetypes.ReleaseConfig, name, repoName string, ta
 					semver = previousReleaseImageSemver
 					fmt.Printf("Image digest for %s image has not changed, tagging with previous dev release semver: %s\n", repoName, semver)
 				} else {
-					newSemver, err := filereader.GenerateNewDevReleaseVersion(previousReleaseImageSemver, "vDev", r.BuildRepoBranchName)
+					r.DevReleaseImageSemver = previousReleaseImageSemver
+					newSemver, err := filereader.GetCurrentEksADevReleaseVersion("vDev", r)
 					if err != nil {
 						return "", errors.Cause(err)
 					}

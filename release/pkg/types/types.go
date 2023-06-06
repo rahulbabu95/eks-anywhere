@@ -48,10 +48,12 @@ type ReleaseConfig struct {
 	DryRun                   bool
 	Weekly                   bool
 	ReleaseEnvironment       string
-	SourceClients            *clients.SourceClients
-	ReleaseClients           *clients.ReleaseClients
-	BundleArtifactsTable     map[string][]Artifact
-	EksAArtifactsTable       map[string][]Artifact
+	// Stores latest release image semver for dev release and is empty if not a dev release
+	DevReleaseImageSemver string
+	SourceClients         *clients.SourceClients
+	ReleaseClients        *clients.ReleaseClients
+	BundleArtifactsTable  map[string][]Artifact
+	EksAArtifactsTable    map[string][]Artifact
 }
 
 type ImageTagOverride struct {
