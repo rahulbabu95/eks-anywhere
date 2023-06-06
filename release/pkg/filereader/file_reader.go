@@ -268,7 +268,7 @@ func GetCurrentEksADevReleaseVersion(releaseVersion string, r *releasetypes.Rele
 		if err != nil {
 			return "", errors.Cause(err)
 		}
-		newDevReleaseVersion = fmt.Sprintf("%s-%s.%d", releaseVersion, releaseVersionIdentifier, latestBuildNumber)
+		newDevReleaseVersion = fmt.Sprintf("v0.0.0-%s.%d", releaseVersionIdentifier, latestBuildNumber)
 		r.BundleNumber = latestBuildNumber
 	}
 	fmt.Printf("New dev release release version: %s\n", newDevReleaseVersion)
