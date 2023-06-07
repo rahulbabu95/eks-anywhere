@@ -239,7 +239,7 @@ func NewBuildNumberFromLastVersion(latestEksaBuildVersion, releaseVersion, branc
 	return newBuildNumber, nil
 }
 
-func GetCurrentEksADevReleaseVersion(releaseVersion string, r *releasetypes.ReleaseConfig) (string, error) {
+func GetCurrentEksADevReleaseVersion(releaseVersion string, r *releasetypes.ReleaseConfig, buildNumber int) (string, error) {
 	fmt.Println("\n==========================================================")
 	fmt.Println("              Dev Release Version Computation")
 	fmt.Println("==========================================================")
@@ -252,24 +252,12 @@ func GetCurrentEksADevReleaseVersion(releaseVersion string, r *releasetypes.Rele
 	if r.BuildRepoBranchName != "main" {
 		releaseVersionIdentifier = fmt.Sprintf("dev-%s+build", r.BuildRepoBranchName)
 	}
-	var (
-		newDevReleaseVersion string
-		latestBuildNumber    int
-		err                  error
-	)
+
+	var newDevReleaseVersion string
 	if r.Weekly {
 		newDevReleaseVersion = fmt.Sprintf("v0.0.0-%s.%s", releaseVersionIdentifier, r.ReleaseDate)
 	} else {
-		if r.DevReleaseImageSemver != "" {
-			latestBuildNumber, err = NewBuildNumberFromLastVersion(r.DevReleaseImageSemver, releaseVersion, r.BuildRepoBranchName)
-		} else {
-			latestBuildNumber, err = GetNextEksADevBuildNumber(releaseVersion, r)
-		}
-		if err != nil {
-			return "", errors.Cause(err)
-		}
-		newDevReleaseVersion = fmt.Sprintf("v0.0.0-%s.%d", releaseVersionIdentifier, latestBuildNumber)
-		r.BundleNumber = latestBuildNumber
+		newDevReleaseVersion = fmt.Sprintf("v0.0.0-%s.%d", releaseVersionIdentifier, buildNumber)
 	}
 	fmt.Printf("New dev release release version: %s\n", newDevReleaseVersion)
 	fmt.Printf("%s Successfully computed current dev release version\n", constants.SuccessIcon)
