@@ -203,7 +203,7 @@ func GetNextEksADevBuildNumber(releaseVersion string, r *releasetypes.ReleaseCon
 		if releaseVersion == "vDev" { // TODO: remove when we update the pipeline
 			releaseVersion = "v0.0.0"
 		}
-		currentEksaBuildNumber, err = GetNewEksaDevBuildNumber(latestBuildVersion, releaseVersion, r.BuildRepoBranchName)
+		currentEksaBuildNumber, err = NewBuildNumberFromLastVersion(latestBuildVersion, releaseVersion, r.BuildRepoBranchName)
 		if err != nil {
 			return -1, errors.Cause(err)
 		}
@@ -213,8 +213,8 @@ func GetNextEksADevBuildNumber(releaseVersion string, r *releasetypes.ReleaseCon
 	return currentEksaBuildNumber, nil
 }
 
-// GetNewEksaDevBuildNumber helper function that bumps the build number for eksa dev build version if found
-func GetNewEksaDevBuildNumber(latestEksaBuildVersion, releaseVersion, branchName string) (int, error) {
+// NewBuildNumberFromLastVersion bumps the build number for eksa dev build version if found
+func NewBuildNumberFromLastVersion(latestEksaBuildVersion, releaseVersion, branchName string) (int, error) {
 	if releaseVersion == "vDev" { // TODO: remove when we update the pipeline
 		releaseVersion = "v0.0.0"
 	}
@@ -261,7 +261,7 @@ func GetCurrentEksADevReleaseVersion(releaseVersion string, r *releasetypes.Rele
 		newDevReleaseVersion = fmt.Sprintf("v0.0.0-%s.%s", releaseVersionIdentifier, r.ReleaseDate)
 	} else {
 		if r.DevReleaseImageSemver != "" {
-			latestBuildNumber, err = GetNewEksaDevBuildNumber(r.DevReleaseImageSemver, releaseVersion, r.BuildRepoBranchName)
+			latestBuildNumber, err = NewBuildNumberFromLastVersion(r.DevReleaseImageSemver, releaseVersion, r.BuildRepoBranchName)
 		} else {
 			latestBuildNumber, err = GetNextEksADevBuildNumber(releaseVersion, r)
 		}

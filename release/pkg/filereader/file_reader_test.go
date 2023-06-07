@@ -18,7 +18,7 @@ import (
 	"testing"
 )
 
-func TestGetNewEksaDevBuildNumber(t *testing.T) {
+func TestNewBuildNumberFromLastVersion(t *testing.T) {
 	testCases := []struct {
 		testName           string
 		latestBuildVersion string
@@ -65,10 +65,10 @@ func TestGetNewEksaDevBuildNumber(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.testName, func(t *testing.T) {
-			if got, err := GetNewEksaDevBuildNumber(tt.latestBuildVersion, tt.releaseVersion, tt.branch); err != nil {
-				t.Fatalf("getNewEksaDevBuildNumber err = %s, want err = nil", err)
+			if got, err := NewBuildNumberFromLastVersion(tt.latestBuildVersion, tt.releaseVersion, tt.branch); err != nil {
+				t.Fatalf("NewBuildNumberFromLastVersion err = %s, want err = nil", err)
 			} else if got != tt.want {
-				t.Fatalf("getNewEksaDevBuildNumber version = %d, want %d", got, tt.want)
+				t.Fatalf("NewBuildNumberFromLastVersion version = %d, want %d", got, tt.want)
 			}
 		})
 	}
