@@ -2,6 +2,7 @@ package clustermanager_test
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -17,6 +18,7 @@ import (
 	"github.com/aws/eks-anywhere/pkg/cluster"
 	"github.com/aws/eks-anywhere/pkg/clustermanager"
 	"github.com/aws/eks-anywhere/pkg/clustermanager/mocks"
+	"github.com/aws/eks-anywhere/pkg/features"
 	"github.com/aws/eks-anywhere/pkg/files"
 	"github.com/aws/eks-anywhere/pkg/types"
 	"github.com/aws/eks-anywhere/release/api/v1alpha1"
@@ -215,6 +217,8 @@ func TestSetManagerFlags(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			os.Unsetenv(features.ExperimentalSelfManagedClusterUpgradeGate)
+			features.ClearCache()
 			for _, e := range tt.featureEnvVars {
 				t.Setenv(e, "true")
 			}

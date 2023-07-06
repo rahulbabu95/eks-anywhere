@@ -9,6 +9,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
+	"github.com/aws/eks-anywhere/pkg/features"
 )
 
 // log is for logging in this package.
@@ -58,7 +60,7 @@ func (r *CloudStackMachineConfig) ValidateUpdate(old runtime.Object) error {
 		return nil
 	}
 
-	if oldCloudStackMachineConfig.IsManagement() {
+	if oldCloudStackMachineConfig.IsManagement() && !features.IsActive(features.ExperimentalSelfManagedClusterUpgrade()) {
 		cloudstackmachineconfiglog.Info("Machine config is associated with workload cluster", "name", oldCloudStackMachineConfig.Name)
 		return nil
 	}

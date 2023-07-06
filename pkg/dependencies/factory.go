@@ -84,6 +84,8 @@ type Dependencies struct {
 	Git                         *gitfactory.GitTools
 	EksdInstaller               *eksd.Installer
 	EksdUpgrader                *eksd.Upgrader
+	KubeProxyCLIUpgrader        clustermanager.KubeProxyCLIUpgrader
+	ManagementUpgrader          *clustermanager.ManagementUpgrader
 	AnalyzerFactory             diagnostics.AnalyzerFactory
 	CollectorFactory            diagnostics.CollectorFactory
 	DignosticCollectorFactory   diagnostics.DiagnosticBundleFactory
@@ -1078,6 +1080,46 @@ func (f *Factory) WithEksdUpgrader() *Factory {
 		return nil
 	})
 
+	return f
+}
+
+// WithKubeProxyCLIUpgrader builds a KubeProxyCLIUpgrader.
+func (f *Factory) WithKubeProxyCLIUpgrader() *Factory {
+	f.WithLogger().WithUnAuthKubeClient()
+
+	f.buildSteps = append(f.buildSteps, func(ctx context.Context) error {
+		var opts []clustermanager.KubeProxyCLIUpgraderOpt
+		if f.config.noTimeouts {
+			opts = append(opts, clustermanager.KubeProxyCLIUpgraderRetrier(*retrier.NewWithNoTimeout()))
+		}
+
+		f.dependencies.KubeProxyCLIUpgrader = clustermanager.NewKubeProxyCLIUpgrader(
+			f.dependencies.Logger,
+			f.dependencies.UnAuthKubeClient,
+			opts...,
+		)
+		return nil
+	})
+	return f
+}
+
+// WithManagementUpgrader builds a KubeProxyCLIUpgrader.
+func (f *Factory) WithManagementUpgrader() *Factory {
+	f.WithLogger().WithUnAuthKubeClient()
+
+	f.buildSteps = append(f.buildSteps, func(ctx context.Context) error {
+		var opts []clustermanager.ManagementUpgraderOpt
+		if f.config.noTimeouts {
+			// opts = append(opts, clustermanager.ManagementUpgraderRetrier(*retrier.NewWithNoTimeout()))
+			opts = append(opts, clustermanager.WithUpgraderNoTimeouts())
+		}
+
+		f.dependencies.ManagementUpgrader = clustermanager.NewManagementUpgrader(
+			f.dependencies.Kubectl,
+			opts...,
+		)
+		return nil
+	})
 	return f
 }
 
