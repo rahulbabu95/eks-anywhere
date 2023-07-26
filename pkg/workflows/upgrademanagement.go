@@ -25,7 +25,6 @@ type UpgradeManagement struct {
 	capiManager        interfaces.CAPIManager
 	eksdInstaller      interfaces.EksdInstaller
 	eksdUpgrader       interfaces.EksdUpgrader
-	clusterUpgrader    interfaces.ClusterUpgrader
 	upgradeChangeDiff  *types.ChangeDiff
 	managementUpgrader interfaces.ManagementUpgrader
 }
@@ -38,7 +37,6 @@ func NewUpgradeManagement(provider providers.Provider,
 	writer filewriter.FileWriter,
 	eksdUpgrader interfaces.EksdUpgrader,
 	eksdInstaller interfaces.EksdInstaller,
-	clusterUpgrader interfaces.ClusterUpgrader,
 	managementUpgrader interfaces.ManagementUpgrader,
 ) *UpgradeManagement {
 	upgradeChangeDiff := types.NewChangeDiff()
@@ -50,7 +48,6 @@ func NewUpgradeManagement(provider providers.Provider,
 		capiManager:        capiManager,
 		eksdUpgrader:       eksdUpgrader,
 		eksdInstaller:      eksdInstaller,
-		clusterUpgrader:    clusterUpgrader,
 		upgradeChangeDiff:  upgradeChangeDiff,
 		managementUpgrader: managementUpgrader,
 	}
@@ -69,7 +66,6 @@ func (c *UpgradeManagement) Run(ctx context.Context, clusterSpec *cluster.Spec, 
 		CAPIManager:        c.capiManager,
 		EksdInstaller:      c.eksdInstaller,
 		EksdUpgrader:       c.eksdUpgrader,
-		ClusterUpgrader:    c.clusterUpgrader,
 		UpgradeChangeDiff:  c.upgradeChangeDiff,
 		ManagementUpgrader: c.managementUpgrader,
 	}
@@ -394,16 +390,6 @@ func (s *managementClusterBeforeUpgrade) Restore(ctx context.Context, commandCon
 }
 
 func (s *upgradeManagementClusterTask) Run(ctx context.Context, commandContext *task.CommandContext) task.Task {
-	if err := commandContext.ClusterUpgrader.PrepareUpgrade(
-		ctx,
-		commandContext.ClusterSpec,
-		commandContext.ManagementCluster.KubeconfigFile,
-		commandContext.ManagementCluster.KubeconfigFile,
-	); err != nil {
-		commandContext.SetError(err)
-		return &CollectMgmtClusterDiagnosticsTask{}
-	}
-
 	logger.Info("Updating EKS-A cluster resource")
 	datacenterConfig := commandContext.Provider.DatacenterConfig(commandContext.ClusterSpec)
 	machineConfigs := commandContext.Provider.MachineConfigs(commandContext.ClusterSpec)
@@ -421,16 +407,6 @@ func (s *upgradeManagementClusterTask) Run(ctx context.Context, commandContext *
 	logger.Info("Upgrading management cluster")
 	err = commandContext.ManagementUpgrader.UpgradeManagementCluster(ctx, commandContext.ManagementCluster)
 	if err != nil {
-		commandContext.SetError(err)
-		return &CollectMgmtClusterDiagnosticsTask{}
-	}
-
-	if err := commandContext.ClusterUpgrader.CleanupAfterUpgrade(
-		ctx,
-		commandContext.ClusterSpec,
-		commandContext.ManagementCluster.KubeconfigFile,
-		commandContext.ManagementCluster.KubeconfigFile,
-	); err != nil {
 		commandContext.SetError(err)
 		return &CollectMgmtClusterDiagnosticsTask{}
 	}

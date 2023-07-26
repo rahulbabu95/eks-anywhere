@@ -219,7 +219,6 @@ func TestFactoryBuildWithMultipleDependencies(t *testing.T) {
 		WithVSphereValidator().
 		WithCiliumTemplater().
 		WithIPValidator().
-		WithKubeProxyCLIUpgrader().
 		WithManagementUpgrader().
 		WithValidatorClients().
 		WithCreateClusterDefaulter(tt.createCLIConfig).
@@ -243,7 +242,6 @@ func TestFactoryBuildWithMultipleDependencies(t *testing.T) {
 	tt.Expect(deps.VSphereValidator).NotTo(BeNil())
 	tt.Expect(deps.CiliumTemplater).NotTo(BeNil())
 	tt.Expect(deps.IPValidator).NotTo(BeNil())
-	tt.Expect(deps.KubeProxyCLIUpgrader).NotTo(BeNil())
 	tt.Expect(deps.ManagementUpgrader).NotTo(BeNil())
 	tt.Expect(deps.UnAuthKubectlClient).NotTo(BeNil())
 }
@@ -552,18 +550,6 @@ func TestFactoryBuildWithCNIInstallerKindnetd(t *testing.T) {
 
 	tt.Expect(err).To(BeNil())
 	tt.Expect(deps.CNIInstaller).NotTo(BeNil())
-}
-
-func TestFactoryBuildWithKubeProxyCLIUpgraderNoTimeout(t *testing.T) {
-	tt := newTest(t, vsphere)
-	deps, err := dependencies.NewFactory().
-		WithLocalExecutables().
-		WithNoTimeouts().
-		WithKubeProxyCLIUpgrader().
-		Build(context.Background())
-
-	tt.Expect(err).To(BeNil())
-	tt.Expect(deps.KubeProxyCLIUpgrader).NotTo(BeNil())
 }
 
 func TestFactoryBuildWithManagementUpgraderNoTimeout(t *testing.T) {
