@@ -109,6 +109,7 @@ func NewClusterSpecValidator(assertions ...ClusterSpecAssertion) *ClusterSpecVal
 		AssertMachineConfigNamespaceMatchesDatacenterConfig,
 		AssertOsFamilyValid,
 		AssertOSImageURL,
+		AssertK8sVersionInOSImageURL,
 		AssertTinkerbellIPAndControlPlaneIPNotSame,
 		AssertHookRetrievableWithoutProxy,
 	)

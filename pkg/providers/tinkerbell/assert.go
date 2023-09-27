@@ -95,6 +95,11 @@ func AssertOSImageURL(spec *ClusterSpec) error {
 	return validateOSImageURL(spec)
 }
 
+// AssertK8sVersionInOSImageURL ensures that the OSImageURL value consists the appropriate K8s Version substring in it.
+func AssertK8sVersionInOSImageURL(spec *ClusterSpec) error {
+	return validateK8sVersionInOSImageURL(spec)
+}
+
 // AssertcontrolPlaneIPNotInUse ensures the endpoint host for the control plane isn't in use.
 // The check may be unreliable due to its implementation.
 func NewIPNotInUseAssertion(client networkutils.NetClient) ClusterSpecAssertion {

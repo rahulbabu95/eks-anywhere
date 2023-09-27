@@ -156,6 +156,139 @@ func TestAssertMachineConfigOSImageURLSpecified_Succeed(t *testing.T) {
 	g.Expect(err).To(gomega.Succeed())
 }
 
+func TestAssertK8sVersionInDataCenterOSImageURL_Succeed(t *testing.T) {
+	g := gomega.NewWithT(t)
+	kube122 := eksav1alpha1.Kube122
+	for name, spec := range map[string]func(*tinkerbell.ClusterSpec){
+		"validate'.'specifier": func(c *tinkerbell.ClusterSpec) {
+			c.DatacenterConfig.Spec.OSImageURL = "test-url-1.22"
+			c.Cluster.Spec.KubernetesVersion = kube122
+		},
+		"validate'-'specifier": func(c *tinkerbell.ClusterSpec) {
+			c.DatacenterConfig.Spec.OSImageURL = "test-url-1-22"
+			c.Cluster.Spec.KubernetesVersion = kube122
+		},
+		"validate'_'specifier": func(c *tinkerbell.ClusterSpec) {
+			c.DatacenterConfig.Spec.OSImageURL = "test-url-1_22"
+			c.Cluster.Spec.KubernetesVersion = kube122
+		},
+		"validate''specifier": func(c *tinkerbell.ClusterSpec) {
+			c.DatacenterConfig.Spec.OSImageURL = "test-url-122"
+			c.Cluster.Spec.KubernetesVersion = kube122
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cluster := NewDefaultValidClusterSpecBuilder().Build()
+			spec(cluster)
+			g.Expect(tinkerbell.AssertK8sVersionInOSImageURL(cluster)).To(gomega.Succeed())
+		})
+	}
+}
+
+func TestAssertK8sVersionInDataCenterOSImageURL_Error(t *testing.T) {
+	g := gomega.NewWithT(t)
+	kube122 := eksav1alpha1.Kube122
+	for name, spec := range map[string]func(*tinkerbell.ClusterSpec){
+		"noK8sVersion": func(c *tinkerbell.ClusterSpec) {
+			c.DatacenterConfig.Spec.OSImageURL = "test-url"
+			c.Cluster.Spec.KubernetesVersion = kube122
+		},
+		"invalidSpecifierinK8sVersion": func(c *tinkerbell.ClusterSpec) {
+			c.DatacenterConfig.Spec.OSImageURL = "test-url-1/22"
+			c.Cluster.Spec.KubernetesVersion = kube122
+		},
+		"emptyImageURL": func(c *tinkerbell.ClusterSpec) {
+			c.DatacenterConfig.Spec.OSImageURL = ""
+			c.Cluster.Spec.KubernetesVersion = kube122
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cluster := NewDefaultValidClusterSpecBuilder().Build()
+			spec(cluster)
+			g.Expect(tinkerbell.AssertK8sVersionInOSImageURL(cluster)).ToNot(gomega.Succeed())
+		})
+	}
+}
+
+func TestAssertK8sVersionInMachineConfigOSImageURL_Succeed(t *testing.T) {
+	g := gomega.NewWithT(t)
+	kube122 := eksav1alpha1.Kube122
+	kube123 := eksav1alpha1.Kube123
+	for name, spec := range map[string]func(*tinkerbell.ClusterSpec){
+		"validate'.'specifier": func(c *tinkerbell.ClusterSpec) {
+			for _, mcRef := range c.Cluster.MachineConfigRefs() {
+				c.MachineConfigs[mcRef.Name].Spec.OSImageURL = "test-url-1.22"
+				c.Cluster.Spec.KubernetesVersion = kube122
+			}
+		},
+		"validate'-'specifier": func(c *tinkerbell.ClusterSpec) {
+			for _, mcRef := range c.Cluster.MachineConfigRefs() {
+				c.MachineConfigs[mcRef.Name].Spec.OSImageURL = "test-url-1-22"
+				c.Cluster.Spec.KubernetesVersion = kube122
+			}
+		},
+		"validate'_'specifier": func(c *tinkerbell.ClusterSpec) {
+			for _, mcRef := range c.Cluster.MachineConfigRefs() {
+				c.MachineConfigs[mcRef.Name].Spec.OSImageURL = "test-url-1-22"
+				c.Cluster.Spec.KubernetesVersion = kube122
+			}
+		},
+		"validate''specifier": func(c *tinkerbell.ClusterSpec) {
+			for _, mcRef := range c.Cluster.MachineConfigRefs() {
+				c.MachineConfigs[mcRef.Name].Spec.OSImageURL = "test-url-122"
+				c.Cluster.Spec.KubernetesVersion = kube122
+			}
+		},
+		"validateCPWorkerDiffVersion": func(c *tinkerbell.ClusterSpec) {
+			c.Cluster.Spec.KubernetesVersion = kube123
+			c.Cluster.Spec.WorkerNodeGroupConfigurations[0].KubernetesVersion = &kube122
+			c.ControlPlaneMachineConfig().Spec.OSImageURL = "test-url-123"
+			wngRef := c.WorkerNodeGroupConfigurations()[0].MachineGroupRef.Name
+			c.MachineConfigs[wngRef].Spec.OSImageURL = "test-url-122"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cluster := NewDefaultValidClusterSpecBuilder().Build()
+			spec(cluster)
+			g.Expect(tinkerbell.AssertK8sVersionInOSImageURL(cluster)).To(gomega.Succeed())
+		})
+	}
+}
+
+func TestAssertK8sVersionInMachineConfigOSImageURL_Error(t *testing.T) {
+	g := gomega.NewWithT(t)
+	kube122 := eksav1alpha1.Kube122
+	kube123 := eksav1alpha1.Kube123
+	for name, spec := range map[string]func(*tinkerbell.ClusterSpec){
+		"validateCPVersionError": func(c *tinkerbell.ClusterSpec) {
+			c.Cluster.Spec.KubernetesVersion = kube123
+			c.Cluster.Spec.WorkerNodeGroupConfigurations[0].KubernetesVersion = &kube122
+			c.ControlPlaneMachineConfig().Spec.OSImageURL = "test-url-122"
+			wngRef := c.WorkerNodeGroupConfigurations()[0].MachineGroupRef.Name
+			c.MachineConfigs[wngRef].Spec.OSImageURL = "test-url-122"
+		},
+		"validateWorkerVersionError": func(c *tinkerbell.ClusterSpec) {
+			c.Cluster.Spec.KubernetesVersion = kube123
+			c.Cluster.Spec.WorkerNodeGroupConfigurations[0].KubernetesVersion = &kube123
+			c.ControlPlaneMachineConfig().Spec.OSImageURL = "test-url-123"
+			wngRef := c.WorkerNodeGroupConfigurations()[0].MachineGroupRef.Name
+			c.MachineConfigs[wngRef].Spec.OSImageURL = "test-url-122"
+		},
+		"validateCPWorkerSameVersionError": func(c *tinkerbell.ClusterSpec) {
+			c.Cluster.Spec.KubernetesVersion = kube123
+			c.ControlPlaneMachineConfig().Spec.OSImageURL = "test-url-123"
+			wngRef := c.WorkerNodeGroupConfigurations()[0].MachineGroupRef.Name
+			c.MachineConfigs[wngRef].Spec.OSImageURL = "test-url-122"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cluster := NewDefaultValidClusterSpecBuilder().Build()
+			spec(cluster)
+			g.Expect(tinkerbell.AssertK8sVersionInOSImageURL(cluster)).ToNot(gomega.Succeed())
+		})
+	}
+}
+
 func TestAssertEtcdMachineRefExists_Exists(t *testing.T) {
 	g := gomega.NewWithT(t)
 	clusterSpec := NewDefaultValidClusterSpecBuilder().Build()

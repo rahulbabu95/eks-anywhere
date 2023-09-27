@@ -7,6 +7,7 @@ import (
 	tinkv1alpha1 "github.com/tinkerbell/tink/pkg/apis/core/v1alpha1"
 
 	"github.com/aws/eks-anywhere/pkg/api/v1alpha1"
+	"github.com/aws/eks-anywhere/pkg/cluster"
 	"github.com/aws/eks-anywhere/pkg/networkutils"
 	"github.com/aws/eks-anywhere/pkg/providers/tinkerbell/hardware"
 )
@@ -44,6 +45,64 @@ func validateOSImageURL(spec *ClusterSpec) error {
 		if mc.Spec.OSImageURL == "" && dcOSImageURL == "" && mc.Spec.OSFamily != v1alpha1.Bottlerocket {
 			return fmt.Errorf("missing OSImageURL on TinkerbellMachineConfig '%s'", mc.ObjectMeta.Name)
 		}
+	}
+	return nil
+}
+
+func validateK8sVersionInOSImageURL(spec *ClusterSpec) error {
+	osImageURL := spec.DatacenterConfig.Spec.OSImageURL
+	k8sVersion := string(spec.Cluster.Spec.KubernetesVersion)
+	// For BR, we set the default OS Image URL to facilitate the k8s version check.
+	// Set this here as there is a dependecy on the datacenter os image url value.
+	// Controller can support auto-import if set here as the validation is shared between controller and CLI and only invoked during validation of the spec.
+	// TODO: Investigate if this can be moved to a separate defaulter logic.
+	for _, mc := range spec.MachineConfigs {
+		if osImageURL == "" && mc.Spec.OSFamily == v1alpha1.Bottlerocket && mc.Spec.OSImageURL == "" {
+			setOSImageURLForBR(mc, spec.RootVersionsBundle())
+		}
+	}
+	if spec.ControlPlaneMachineConfig().Spec.OSImageURL != "" {
+		osImageURL = spec.ControlPlaneMachineConfig().Spec.OSImageURL
+	}
+	if err := checkK8sVersionMatch(k8sVersion, osImageURL); err != nil {
+		return fmt.Errorf("kubernetes version check in OSImageURL failed for %s: %v", spec.ControlPlaneMachineConfig().Name, err)
+	}
+	if err := checkWngOSImageK8sVersion(spec, k8sVersion, osImageURL); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setOSImageURLForBR(mc *v1alpha1.TinkerbellMachineConfig, bundle *cluster.VersionsBundle) {
+	brURI := bundle.EksD.Raw.Bottlerocket.URI
+	mc.Spec.OSImageURL = brURI
+}
+
+func checkWngOSImageK8sVersion(spec *ClusterSpec, k8sVersion, osImageURL string) error {
+	for _, wng := range spec.Cluster.Spec.WorkerNodeGroupConfigurations {
+		wngRefName := wng.MachineGroupRef.Name
+		if wng.KubernetesVersion != nil {
+			k8sVersion = string(*wng.KubernetesVersion)
+		}
+		if spec.MachineConfigs[wngRefName].Spec.OSImageURL != "" {
+			osImageURL = spec.MachineConfigs[wngRefName].Spec.OSImageURL
+		}
+		if err := checkK8sVersionMatch(k8sVersion, osImageURL); err != nil {
+			return fmt.Errorf("kubernetes version check in OSImageURL failed for %s: %v", wngRefName, err)
+		}
+	}
+	return nil
+}
+
+func checkK8sVersionMatch(k8sVersion, imageURL string) error {
+	versionExtractor := strings.NewReplacer("-", "", ".", "", "_", "")
+	OSimageURL := versionExtractor.Replace(imageURL)
+	kubeVersion := versionExtractor.Replace(k8sVersion)
+	// This will return an error if the OS image URL does not contain the specified kubernetes version.
+	// For ex if the kubernetes version is 1.23,
+	// the image url should include 1.23 or 1-23, 1_23 or 123 i.e. ubuntu-1-23.gz or similar in the string.
+	if !strings.Contains(OSimageURL, kubeVersion) {
+		return fmt.Errorf("invalid OSImageURL: cluster kubernetes version is %s but OSImageURL is %s. If the kubernetes version is 1.23, the template name should include 1.23, 1_23, 1-23 or 123", string(k8sVersion), imageURL)
 	}
 	return nil
 }
