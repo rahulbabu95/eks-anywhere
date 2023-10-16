@@ -90,14 +90,10 @@ func AssertOsFamilyValid(spec *ClusterSpec) error {
 	return validateOsFamily(spec)
 }
 
-// AssertOSImageURL ensures that the OSImageURL value is either set at the datacenter config level or set for each machine config and not at both levels.
+// AssertOSImageURL ensures that the OSImageURL value is either set at the datacenter config level or set for each
+// machine config and not at both levels.
 func AssertOSImageURL(spec *ClusterSpec) error {
 	return validateOSImageURL(spec)
-}
-
-// AssertK8sVersionInOSImageURL ensures that the OSImageURL value consists the appropriate K8s Version substring in it.
-func AssertK8sVersionInOSImageURL(spec *ClusterSpec) error {
-	return validateK8sVersionInOSImageURL(spec)
 }
 
 // AssertcontrolPlaneIPNotInUse ensures the endpoint host for the control plane isn't in use.
