@@ -79,6 +79,13 @@ env:
     T_VSPHERE_TLS_INSECURE: "vsphere_ci_beta_connection:tls_insecure"
     T_VSPHERE_TLS_THUMBPRINT: "vsphere_ci_beta_connection:tls_thumbprint"
     T_VSPHERE_TAG: "vsphere_ci_beta_connection:vm_test_tag"
+    EKSA_AWS_ACCESS_KEY_ID: "packages_ci_beta:aws_access_key_id"
+    EKSA_AWS_SECRET_ACCESS_KEY: "packages_ci_beta:aws_secret_access_key_id"
+    EKSA_AWS_REGION: "packages_ci_beta:aws_region"
+    ROUTE53_ACCESS_KEY_ID: "packages_ci_beta:route53_access_key_id"
+    ROUTE53_SECRET_ACCESS_KEY: "packages_ci_beta:route53_secret_access_key"
+    ROUTE53_REGION: "packages_ci_beta:route53_region"
+    ROUTE53_ZONEID: "packages_ci_beta:route53_zoneid"
     #cloudstack secrets
     T_HTTP_PROXY_CLOUDSTACK: "proxy-config-data:httpProxyCloudStack"
     T_HTTPS_PROXY_CLOUDSTACK: "proxy-config-data:httpsProxyCloudStack"
