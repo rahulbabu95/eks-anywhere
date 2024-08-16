@@ -11,6 +11,7 @@ import (
 	"github.com/aws/eks-anywhere/pkg/constants"
 	"github.com/aws/eks-anywhere/pkg/filewriter"
 	"github.com/aws/eks-anywhere/pkg/retrier"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -117,10 +118,21 @@ func (w *WorkloadCluster) ValidateClusterDelete() {
 }
 
 func (w *WorkloadCluster) writeKubeconfigToDisk(ctx context.Context, secretName string, filePath string) error {
-	secret, err := w.KubectlClient.GetSecretFromNamespace(ctx, w.ManagementClusterKubeconfigFile(), secretName, constants.EksaSystemNamespace)
-	if err != nil {
-		return fmt.Errorf("failed to get kubeconfig for cluster: %s", err)
+	// Adding a retry logic here because the secret retreival does not always
+	// succeed on the first try and returns a 'not found' error sometimes after the kubeconfig becomes
+	// available in the cluster.
+	var secret *corev1.Secret
+	if err := retrier.Retry(12, 5*time.Second, func() error {
+		s, err := w.KubectlClient.GetSecretFromNamespace(ctx, w.ManagementClusterKubeconfigFile(), secretName, constants.EksaSystemNamespace)
+		if err != nil {
+			return fmt.Errorf("failed to get kubeconfig for cluster: %s", err)
+		}
+		secret = s
+		return nil
+	}); err != nil {
+		return err
 	}
+
 	kubeconfig := secret.Data["value"]
 	if err := w.Provider.UpdateKubeConfig(&kubeconfig, w.ClusterName); err != nil {
 		return fmt.Errorf("failed to update kubeconfig for cluster: %s", err)
