@@ -7,16 +7,8 @@ skipped_tests:
 
 # Proxy API tests skipped due to being unable to run in cloudstack CI env. We should probably revisit these and see if we can unskip them now
 # as we have a proxy env set up in the cloudstack CI env now.
-
-# MultiEndpoint
-- TestCloudStackKubernetes126MultiEndpointSimpleFlow
-- TestCloudStackKubernetes127MultiEndpointSimpleFlow
-- TestCloudStackKubernetes128MultiEndpointSimpleFlow
-- TestCloudStackKubernetes129MultiEndpointSimpleFlow
-- TestCloudStackKubernetes130MultiEndpointSimpleFlow
-
 # Side effects
-- TestCloudStackKubernetes129WithOIDCManagementClusterUpgradeFromLatestSideEffects
+
 
 # Temporary disables to stabilize tests. Owners should work on fixes and enable these test along with their fix's PR
 - TestTinkerbellAirgappedKubernetes129UbuntuProxyConfigFlow
@@ -25,7 +17,6 @@ skipped_tests:
 
 # UpgradeFromLatestTests for new K8s version (expected to work only after the release is out)
 - TestDockerKubernetes130AirgappedUpgradeFromLatestRegistryMirrorAndCert
-- TestCloudStackKubernetes130WithOIDCManagementClusterUpgradeFromLatestSideEffects
 
 # Snow
 - TestSnowKubernetes126SimpleFlow
